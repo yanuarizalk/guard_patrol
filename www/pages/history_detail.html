@@ -1,0 +1,56 @@
+<div class="page" data-name="history_detail">
+    <div class="navbar">
+        <div class="navbar-bg"></div>
+        <div class="navbar-inner">
+            <div class="left"><i class="f7-icons" id="back">arrow_left</i></div>
+            <div class="title">Record Detail</div>
+            <div class="right menu">
+                <i class="f7-icons link" id="location" title="Location" data-lat="" data-lng="">location_circle_fill</i>
+            </div>
+        </div>
+    </div>
+    <div class="page-content">
+
+        <div class="block-title"><h3>Picture taken :</h3></div>
+        <div class="block" id="taken-picture">
+            <img src="" alt="" id="pic" />
+        </div>
+        <table class="block" id="info">
+            <tr>
+                <td width="20%">Taken on: </td>
+                <td width="80%" id="on"></td>
+            </tr>
+            <tr>
+                <td width="20%">Taken by: </td>
+                <td width="80%" id="by"></td>
+            </tr>
+            <tr>
+                <td>Remark: </td>
+                <td id="remark"></td>
+            </tr>
+        </table>
+        <!--span>Taken on: <b id="dt"></b></span>
+        <span>Remarks: <textarea id="remark" rows="5" placeholder="" readonly></textarea></span-->
+        <style>
+            #taken-picture {
+                width: 100%;
+            }
+            #taken-picture img {
+                width: 100%;
+                box-shadow: 0 0 3px 0 darkslategrey;
+            }
+            #info {
+                width: 100%; font-size: 12pt;
+            }
+            #info tr td:nth-child(1) {
+                width: 20%; min-width: 80px;
+            }
+            #info tr td:nth-child(2) {
+                width: 80%;
+            }
+            #info tr td {
+                vertical-align: top;
+            }
+        </style>
+    </div>
+</div>

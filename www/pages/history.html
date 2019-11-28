@@ -1,0 +1,42 @@
+<div class="page" data-name="history">
+    <div class="navbar">
+        <div class="navbar-bg"></div>
+        <div class="navbar-inner">
+            <div class="left"><i class="f7-icons" id="back">arrow_left</i></div>
+            <div class="title">History</div>
+            <div class="right menu">
+                <i class="f7-icons link" id="filter_date">calendar_today</i>
+                <i class="f7-icons link" id="filter_search">search_circle_fill</i>
+            </div>
+        </div>
+    </div>
+    <div class="page-content">
+        <div class="ptr-preloader">
+            <div class="preloader"></div>
+            <div class="ptr-arrow"></div>
+        </div>
+        <table id="viewer" class="table-viewer">
+            <thead>
+                <tr>
+                    <th width="40%">Name</th>
+                    <th width="35%">Area</th>
+                    <th width="25%">Time</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+
+        <style>
+            table.table-viewer tbody tr {
+                background-color: rgba(205, 92, 92, 0.3);
+            }
+            table.table-viewer tbody tr.active {
+                background-color: rgba(60, 179, 114, 0.3);
+            }
+            table.table-viewer tbody tr td:nth-child(3) {
+                text-align: right;
+            }
+        </style>
+    </div>
+</div>

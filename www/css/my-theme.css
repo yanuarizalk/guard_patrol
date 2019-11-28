@@ -1,0 +1,27 @@
+:root {
+    --f7-page-bg-color: lightsalmon;
+    --f7-appbar-bg-color: darksalmon;
+    --f7-list-bg-color: darksalmon;
+    --f7-input-clear-button-color: antiquewhite;
+    /*--f7-preloader-modal-bg-color: */
+    --f7-navbar-bg-color: darksalmon;
+    --f7-navbar-text-color: saddlebrown;
+    --my-text-color: rgba(150, 50, 50, 0.8);
+    --f7-dialog-title-text-color: saddlebrown;
+    --f7-dialog-input-bg-color: darksalmon;
+    --f7-navbar-inner-padding-left: 10px;
+    --f7-dialog-input-border-color: darksalmon;
+}
+
+.color-theme-mine {
+    /*--f7-theme-color: salmon;*/
+    --f7-theme-color: #ff5353;
+    --f7-theme-color-rgb: 225,125,100;
+    --f7-theme-color-shade: darksalmon;
+    --f7-theme-color-tint: lightsalmon;
+
+}
+
+i.f7-icons {
+    color: #753d3d;
+}

@@ -1,0 +1,28 @@
+<div class="page" data-name="check_common">
+    <div class="navbar">
+        <div class="navbar-bg"></div>
+        <div class="navbar-inner">
+            <div class="left"><i class="f7-icons" id="back">arrow_left</i></div>
+            <div class="title">Scanning...</div>
+        </div>
+    </div>
+    <div class="page-content">
+        <div class="block">
+            <p>Current checkpoint: <b id="cur_cp"></b></p>
+        </div>
+        <div class="block actions">
+            <textarea id="remark" rows="5" placeholder="Write remark..."></textarea>
+            <button class="button button-fill" id="submit">Submit</button>
+        </div>
+
+        <style>
+            .block.actions textarea {
+                background-color: moccasin;
+                padding: 20px;
+                width: 100%;
+                box-shadow: 0 0 5px 5px darksalmon;
+                margin-bottom: 20px;
+            }
+        </style>
+    </div>
+</div>
