@@ -1,6 +1,9 @@
-var API_SERVER = "https://sgcp.tyfountex.com/";
-var DEFAULT_LOCATION = {
+const API_SERVER = "https://sgcp.tyfountex.com/";
+const DEFAULT_LOCATION = {
     lat: -7.564901266365109, lng: 110.7632319664257
+};
+const CHECKIN_METHOD = {
+    CLASSIC: 0, COMMON: 1, MODERN: 2
 };
 var app = new Framework7({
     root: "#app", name: "Security Guard Checkpoint",
@@ -25,4 +28,12 @@ async function onDeviceReady() {
             reloadAll: true, clearPreviousHistory: true
         });
     }
+
+    $$(document).on("backbutton", function(ev) {
+        if (app.dialog.get() != null) return;
+        if ($$('#back').length > 0) {
+            $$('#back').trigger('click');
+            ev.preventDefault();
+        } else navigator.app.exitApp();
+    });
 }

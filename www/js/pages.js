@@ -56,6 +56,14 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             break;
         }
         case "check-in": {
+            function is_finished() {
+                if ($$('#cp-list > ul > li .item-side i.active').length
+                    >=
+                    $$('#cp-list > ul > li .item-side i').length)
+                    return true;
+                else return false;
+            }
+
             app.preloader.show();
             app.request.post(API_SERVER + "checkpoint", null, 
             function(data, status, xhr) {
@@ -117,6 +125,10 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 app.views.main.router.navigate("/map");
             });
             $$("#check").on("click", function(ev) {
+                if (is_finished()) {
+                    app.dialog.alert("You have finished the route today! Please, take care of your body!", "Error");
+                    return;
+                }
                 switch ($$(this).data("method").toUpperCase()) {
                     case "COMMON": {
                         app.views.main.router.navigate("/check_common");
@@ -136,7 +148,11 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             });
             $$("#restart").on("click", async function() {
                 if ($$('#cp-list > ul > li .item-side i.active').length < 1) {
-                    app.dialog.alert("You haven't passed 1 route yet");
+                    app.dialog.alert("You haven't passed 1 route yet", "Error");
+                    return;
+                }
+                if (is_finished()) {
+                    app.dialog.alert("You can't restart/revert if you have finished the route", "Error");
                     return;
                 }
                 var confirm = await new Promise(function(res, rej) {
@@ -167,7 +183,11 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             });
             $$("#revert").on("click", async function() {
                 if ($$('#cp-list > ul > li .item-side i.active').length < 1) {
-                    app.dialog.alert("You haven't passed 1 route yet");
+                    app.dialog.alert("You haven't passed 1 route yet", "Error");
+                    return;
+                }
+                if (is_finished()) {
+                    app.dialog.alert("You can't restart/revert if you have finished the route", "Error");
                     return;
                 }
                 var confirm = await new Promise(function(res, rej) {
@@ -290,20 +310,43 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             break;
         }
         case "check_classic": {
-            var area_pic = null;
-            navigator.camera.getPicture(function(data) {
-                $$("#taken-picture img")[0].src = "data:image/jpeg;base64," + data;
-                area_pic = data;
-                //$$("#taken-picture img")[0].src = data;
-                //document.getElementById("pic").src = data;
-                $$(".navbar .title").html("Check - In");
-            }, function(err){
-                if (err == "No Image Selected")
-                    app.views.main.router.back();
-                app.dialog.alert(err, "Error");
-            }, {
-                saveToPhotoAlbum: false, destinationType: 0
-            });
+            var area_pic = null; var source = 1;
+            app.dialog.create({
+                title: 'Source',
+                text: 'Select a source which the picture is taken from',
+                buttons: [
+                    { text: 'Camera', onClick: function() {
+                        source = Camera.PictureSourceType.CAMERA;
+                    }},
+                    { text: 'Existing file', onClick: function() {
+                        source = Camera.PictureSourceType.PHOTOLIBRARY;
+                    }}
+                ],
+                verticalButtons: true,
+                closeByBackdropClick: false,
+                on: {
+                    closed: function() {
+                        navigator.camera.getPicture(function(data) {
+                            $$("#taken-picture img")[0].src = "data:image/jpeg;base64," + data;
+                            area_pic = data;
+                            //$$("#taken-picture img")[0].src = data;
+                            //document.getElementById("pic").src = data;
+                            $$(".navbar .title").html("Check - In");
+                        }, function(err){
+                            if (err == "No Image Selected") {
+                                app.views.main.router.back();
+                                return;
+                            }
+                            app.dialog.alert(err, "Error");
+                        }, {
+                            saveToPhotoAlbum: false, destinationType: 0, correctOrrientation: true,
+                            sourceType: source
+                        });
+                    }
+                }
+            }).open();
+
+            
             $$("#submit").on("click", async function(ev) {
                 if (area_pic == null) return;
                 var confirm = await new Promise(function(res, rej) {
@@ -445,7 +488,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
         case "history": {
             var account = await get_profile();
             var filter_calender = app.calendar.create(), filter_date = new Date().setHours(0,0,0,0), filter_search = "";
-
+            $$('#date').html(new Date(filter_date).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: 'numeric'} ) );
             $('#viewer').on('processing.dt', function(ev, settings, proc) {
                 $('.dataTables_processing').css('display', 'none');
                 if (proc) app.preloader.show();
@@ -489,6 +532,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 filter_search = '';
                 filter_calender.close();
                 viewer.ajax.reload();
+                $$('#date').html(new Date(filter_date).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: 'numeric'} ) );
             });
             $$('#filter_date').on('click', function() {
                 filter_calender.open();
@@ -501,7 +545,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             });
 
             $$(document).on('click', '#viewer tbody tr', function() {
-                console.log($$(this));
+                //console.log($$(this));
                 if ($$(this).children('td').hasClass('dataTables_empty')) return;
                 app.views.main.router.navigate({
                     name: 'history_detail',
@@ -548,6 +592,111 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             });
             break;
         }
+        case "manage": {
+            $$(".menu-container").on("click", async function(ev) {
+                if ($$(this).data('name') == "mode") {
+                    var account = await get_profile();
+                    var confirm = await new Promise(function(res, rej) {
+                        app.dialog.confirm("Are you sure want to change it?<br><i>It will not be applied instantly & will be changed on the next day</i>", "Switch Mode Confirmation", 
+                        function() { res(true); }, function() { res(false); });
+                    });
+                    if (!confirm) return;
+                    app.request.post(API_SERVER + "settings/switch_mode", {
+                        account: {
+                            nrp: account[0], token: account[1]
+                        }
+                    }, 
+                    function(data, status, xhr) {
+                        app.preloader.hide();
+                        if (data.status == "error") {
+                            app.dialog.alert(data.desc, "Error"); return;
+                        } else if (data.status == "success") {
+                            app.dialog.alert("Switch mode will be changed at midnight, so make sure there is no check-in activity around that time", "Switch Mode Success");
+                        }
+                    }, function(xhr, status) {
+                        app.preloader.hide();
+                        app.dialog.alert("An error occured while sending data to the server", "Unexpected Server Error");
+                        console.log(xhr);
+                    }, "json");
+                    return;
+                }
+                app.views.main.router.navigate("/" + $$(this).data("name"));
+            });
+            break;
+        }
+        case "users": {
+            var account = await get_profile();
+            var filter_calender = app.calendar.create(), filter_date = new Date().setHours(0,0,0,0), filter_search = "";
+
+            $('#viewer').on('processing.dt', function(ev, settings, proc) {
+                $('.dataTables_processing').css('display', 'none');
+                if (proc) app.preloader.show();
+                else app.preloader.hide();
+            });
+            viewer = $('#viewer').DataTable({
+                serverSide: true,
+                ajax: {
+                    url: API_SERVER + 'manage/dt', type: 'POST',
+                    data: function(data) {
+                        data.account = {
+                            nrp: account[0], token: account[1]
+                        };
+                        data.date = filter_date / 1000;
+                        data.find = filter_search;
+                    }
+                }, 
+                responsive: true,
+                paging: false, processing: true,
+                searching: false,
+                columns: [
+                    {data: 'nrp'},
+                    {data: 'name'},
+                    {data: 'registration_dt', searchable: false}
+                ], 
+                createdRow: function(row, data, index) {
+                    data = data.DT_RowData;
+                    var isMatch = plugin.google.maps.geometry.poly.containsLocation(data.coor, JSON.parse(data.region));
+                    if (isMatch)
+                        $(row).addClass('active');
+                },
+                orderMulti: false, order: [[2, 'desc']],
+                language: {
+                    emptyTable: 'There is no checkpoint record on this date',
+                    info: 'Showing _END_ entries',
+                    infoEmpty: ''
+                }
+            });
+            filter_calender.on('change', function(cal) {
+                filter_date = new Date(cal.value).valueOf();
+                filter_search = '';
+                filter_calender.close();
+                viewer.ajax.reload();
+            });
+            $$('#filter_date').on('click', function() {
+                filter_calender.open();
+            });
+            $$('#filter_search').on('click', function() {
+                app.dialog.prompt("Search by User name / Area name", "Search", function(val) {
+                    filter_search = val;
+                    viewer.ajax.reload();
+                });
+            });
+
+            $$(document).on('click', '#viewer tbody tr', function() {
+                console.log($$(this));
+                if ($$(this).children('td').hasClass('dataTables_empty')) return;
+                app.views.main.router.navigate({
+                    name: 'history_detail',
+                    params: {
+                        history_id: parseInt($(this).data('history_id'))
+                    }
+                });
+            });
+
+            break;
+        }
+
+
         default: break;
     }
     //console.log(page);
@@ -590,3 +739,5 @@ $$(document).on("page:reinit", ".page[data-name=\"check-in\"]", async function(e
 $$(document).on("click", "#back", function() {
     app.views.main.router.back({ignoreCache: false});
 });
+
+//document.addEventListener('backbutton', onBack, false);

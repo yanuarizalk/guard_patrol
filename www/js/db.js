@@ -51,6 +51,7 @@ async function check_profile() {
             }
         }, function(xhr, status) {
             res(false);
+            app.dialog.alert("Unable to connect to the server. Make sure your internet is usable & active", "Error");
             console.log(xhr);
         }, "json");
     });

@@ -4,6 +4,7 @@
 
 * {
     -webkit-tap-highlight-color: rgba(0,0,0,0); /* make transparent link selection, adjust last value opacity 0 to 1.0 */
+    color: saddlebrown;
 }
 
 body {
@@ -88,15 +89,14 @@ body {
     margin-top: 20%;
 }
 .menus > .menu-container {
-    width: calc(30% - 40px);
-    margin: 20px;
+    width: 30%;
 }
 .menus > .menu-container > .menu-img {
     background-color: darksalmon;
     padding: 15px 10px;
     border-radius: 5px;
-    margin-bottom: 10px;
     border: 0.5px solid salmon;
+    margin: 20px 20px 10px 20px;
 }
 .menus > .menu-container:hover > .menu-img {
     filter: brightness(1.1);
@@ -106,6 +106,11 @@ body {
 }
 .menus > .menu-container > .menu-img img {
     width: 75%; display: block; margin: 0 auto;
+}
+.menus > .menu-container > .menu-img i.f7-icons {
+    display: block;
+    margin: 5px auto;
+    font-size: 30px;
 }
 .menus > .menu-container > .menu-caption {
     text-align: center;
@@ -147,7 +152,7 @@ body {
     border-bottom: 1px solid salmon !important;
 }
 table.dataTable thead th {
-    border-bottom: 1px solid salmon;
+    border-bottom: 1px solid salmon !important;
 }
 .table-viewer tbody {
     color: darkslategrey;
@@ -155,12 +160,18 @@ table.dataTable thead th {
 .table-viewer tbody tr:hover {
     filter: brightness(0.5);
 }
+.dataTables_wrapper .dataTables_info {
+    color: saddlebrown !important;
+}
 
 .dialog .dialog-inner {
     background-color: darksalmon;
     border-bottom: 0;
 }
 .dialog .dialog-buttons {
+    background-color: darksalmon;
+}
+.dialog.dialog-buttons-vertical .dialog-buttons {
     background-color: lightsalmon;
 }
 .dialog .dialog-buttons .dialog-button {
