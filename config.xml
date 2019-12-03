@@ -49,7 +49,8 @@
     <preference name="GOOGLE_MAPS_IOS_API_KEY" value="AIzaSyDpwlM-2qmTQNIEGRO-Zid12bIRm31EFOs" />
     <preference name="AutoHideSplashScreen" value="true" />
     <preference name="SplashScreenDelay" value="3000" />
-    <preference name="SplashScreenSpinnerColor" value="black" />
+    <preference name="ShowSplashScreenSpinner" value="false"/>
+    <!--preference name="SplashScreenSpinnerColor" value="black" /-->
 
 
 </widget>

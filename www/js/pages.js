@@ -16,7 +16,6 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     nrp: nrp
                 }, function(data, status, xhr) {
                     app.preloader.hide();
-                    //data = JSON.parse(data);
                     if (data.status == "error") {
                         app.dialog.alert(data.desc, "Error"); return;
                     } else if (data.status == "success") {
@@ -141,11 +140,11 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     }
                 }
             });
-            $$(document).on("click", "#cp-list > ul > li", function() {
+            /*$$(document).on("click", "#cp-list > ul > li", function() {
                 var lat = $$(this).data('lat');
                 var lng = $$(this).data('lng');
                 app.views.main.router.navigate('/map/?use_ls=1&lat=' + lat + '&lng=' + lng + "&no_marker=1");
-            });
+            });*/
             $$("#restart").on("click", async function() {
                 if ($$('#cp-list > ul > li .item-side i.active').length < 1) {
                     app.dialog.alert("You haven't passed 1 route yet", "Error");
@@ -518,7 +517,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     data = data.DT_RowData;
                     var isMatch = plugin.google.maps.geometry.poly.containsLocation(data.coor, JSON.parse(data.region));
                     if (isMatch)
-                        $(row).addClass('active');
+                        $$(row).addClass('active');
                 },
                 orderMulti: false, order: [[2, 'desc']],
                 language: {
@@ -544,7 +543,8 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 });
             });
 
-            $$(document).on('click', '#viewer tbody tr', function() {
+            $(document).off('click', '#viewer tbody tr');
+            $(document).on('click', '#viewer tbody tr', function() {
                 //console.log($$(this));
                 if ($$(this).children('td').hasClass('dataTables_empty')) return;
                 app.views.main.router.navigate({
@@ -626,22 +626,69 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
         }
         case "users": {
             var account = await get_profile();
-            var filter_calender = app.calendar.create(), filter_date = new Date().setHours(0,0,0,0), filter_search = "";
+            var filter_search = "";
 
             $('#viewer').on('processing.dt', function(ev, settings, proc) {
                 $('.dataTables_processing').css('display', 'none');
                 if (proc) app.preloader.show();
                 else app.preloader.hide();
             });
+            var ed = app.dialog.create({
+                content: $$('#editor-dialog').html(),
+                buttons: [
+                    {text: "Save", close: false, onClick: async function() {
+                        app.input.validateInputs('#editor');
+                        if ($$('#editor input.input-invalid').length > 0) return;
+
+                        app.preloader.show();
+                        var account = await get_profile(), xtra = null;
+                        if (ed.params.title.toLowerCase() == "edit user")
+                            xtra = $('#editor').data('prev_nrp');
+                        app.request.post(API_SERVER + "users/" + (xtra == null ? "new" : "edit"), {
+                            account: {
+                                nrp: account[0], token: account[1]
+                            },
+                            input: app.form.convertToData('#editor'),
+                            previous_data: xtra
+                        }, 
+                        function(data, status, xhr) {
+                            app.preloader.hide();
+                            ed.close();
+                            if (data.status == "error") {
+                                app.dialog.alert(data.desc, "Error");
+                            } else if (data.status == "success") {
+                                $('#viewer').DataTable().ajax.reload();
+                            }
+                        }, function(xhr, status) {
+                            app.preloader.hide();
+                            ed.close();
+                            app.dialog.alert('An error occured while sending data to the server', 'Error');
+                            console.log(xhr);
+                        }, "json");
+                    }},
+                    {text: "Cancel"}
+                ],
+                closeByBackdropClick: false,
+                cssClass: 'dialog-nopad',
+                on: {
+                    opened: function() {
+                        new Cleave(".dialog #editor input[name='nrp']", {
+                            delimiters: ['-'],
+                            blocks: [6,1],
+                            numericOnly: true
+                        });
+                    }
+                }
+            });
+            $$('#editor').remove();
             viewer = $('#viewer').DataTable({
                 serverSide: true,
                 ajax: {
-                    url: API_SERVER + 'manage/dt', type: 'POST',
+                    url: API_SERVER + 'users/dt', type: 'POST',
                     data: function(data) {
                         data.account = {
                             nrp: account[0], token: account[1]
                         };
-                        data.date = filter_date / 1000;
                         data.find = filter_search;
                     }
                 }, 
@@ -651,46 +698,111 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 columns: [
                     {data: 'nrp'},
                     {data: 'name'},
-                    {data: 'registration_dt', searchable: false}
+                    {data: 'level', searchable: false, render: function(data) {
+                        return data == 0 ? "Security" : data == 1 ? "Manager" : data == 2 ? "Admin" : "Unkown";
+                    }}
                 ], 
                 createdRow: function(row, data, index) {
                     data = data.DT_RowData;
-                    var isMatch = plugin.google.maps.geometry.poly.containsLocation(data.coor, JSON.parse(data.region));
-                    if (isMatch)
-                        $(row).addClass('active');
+                    if (data.is_used == 1) {
+                        $$(row).addClass('active');
+                    }
                 },
                 orderMulti: false, order: [[2, 'desc']],
                 language: {
-                    emptyTable: 'There is no checkpoint record on this date',
+                    emptyTable: 'There is no user',
                     info: 'Showing _END_ entries',
                     infoEmpty: ''
                 }
             });
-            filter_calender.on('change', function(cal) {
-                filter_date = new Date(cal.value).valueOf();
-                filter_search = '';
-                filter_calender.close();
-                viewer.ajax.reload();
-            });
-            $$('#filter_date').on('click', function() {
-                filter_calender.open();
-            });
             $$('#filter_search').on('click', function() {
-                app.dialog.prompt("Search by User name / Area name", "Search", function(val) {
+                app.dialog.prompt("Search by NRP / User name", "Search", function(val) {
                     filter_search = val;
                     viewer.ajax.reload();
                 });
             });
-
-            $$(document).on('click', '#viewer tbody tr', function() {
-                console.log($$(this));
-                if ($$(this).children('td').hasClass('dataTables_empty')) return;
-                app.views.main.router.navigate({
-                    name: 'history_detail',
-                    params: {
-                        history_id: parseInt($(this).data('history_id'))
-                    }
+            $$('#unreg-user').on('click', async function() {
+                app.popover.close();
+                if ($('#ctx-user').data('is_used') == 0) {
+                    app.dialog.alert('This user haven\'t been registered yet!', 'Error');
+                    return;
+                }
+                var confirm = await new Promise(function(res, rej) {
+                    app.dialog.confirm("Are you sure? want to unregister this one?<i>The current user who have been registered using it will be asked to register again</i>", "Unregister Confirmation", 
+                    function() { res(true); }, function() { res(false); });
                 });
+                if (!confirm) return;
+                app.preloader.show();
+                var account = await get_profile();
+                var user_data = $('#ctx-user').data();
+                app.request.post(API_SERVER + "users/unreg", {
+                    account: {
+                        nrp: account[0], token: account[1]
+                    },
+                    nrp: user_data.nrp
+                }, 
+                function(data, status, xhr) {
+                    app.preloader.hide();
+                    if (data.status == "error") {
+                        app.dialog.alert(data.desc, "Error");
+                    } else if (data.status == "success") {
+                        app.dialog.alert("User "+ user_data.name +" have been unregistered!", "Unregister Success");
+                        $('#viewer').DataTable().ajax.reload();
+                    }
+                }, function(xhr, status) {
+                    app.preloader.hide();
+                    app.dialog.alert('An error occured while sending data to the server', 'Error');
+                    console.log(xhr);
+                }, "json");
+            });
+            $$('#new-user').on('click', function() {
+                ed.setTitle('New User');
+                ed.open();
+                app.form.fillFromData('#editor', {nrp: '', name: '', level: '0'});
+            });
+            $$('#edit-user').on('click', function() {
+                app.popover.close();
+                var data = $('#ctx-user').data();
+                ed.setTitle('Edit User');
+                ed.open();
+                app.form.fillFromData('#editor', {nrp: data.nrp, name: data.name, level: data.level});
+                $('#editor').data('prev_nrp', data.nrp);
+            });
+            $$('#remove-user').on('click', async function() {
+                app.popover.close();
+                var confirm = await new Promise(function(res, rej) {
+                    app.dialog.confirm("Are you sure you want to remove it permanently?", "Remove Confirmation", 
+                    function() { res(true); }, function() { res(false); });
+                });
+                if (!confirm) return;
+                app.preloader.show();
+                var account = await get_profile();
+                var user_data = $('#ctx-user').data();
+                app.request.post(API_SERVER + "users/remove", {
+                    account: {
+                        nrp: account[0], token: account[1]
+                    },
+                    nrp: user_data.nrp
+                }, 
+                function(data, status, xhr) {
+                    app.preloader.hide();
+                    if (data.status == "error") {
+                        app.dialog.alert(data.desc, "Error");
+                    } else if (data.status == "success") {
+                        app.dialog.alert("User "+ user_data.name +" have been removed!", "Removal Success");
+                        $('#viewer').DataTable().ajax.reload();
+                    }
+                }, function(xhr, status) {
+                    app.preloader.hide();
+                    app.dialog.alert('An error occured while sending data to the server', 'Error');
+                    console.log(xhr);
+                }, "json");
+            });
+            $(document).off('click', '#viewer tbody tr');
+            $(document).on('click', '#viewer tbody tr', function() {
+                var index = $$(this)[0].rowIndex;
+                app.popover.open("#ctx-user", "#viewer tbody tr:nth-child("+ index +") td:nth-child(3)", true);
+                $('#ctx-user').data($(this).data());
             });
 
             break;
@@ -699,33 +811,26 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
 
         default: break;
     }
-    //console.log(page);
 });
 
 async function init_today_cp() {
     if ($$(app.views.main.router.currentPageEl).data('name') != "check-in") return;
     var account = await get_profile();
-    //var today = new Date().setHours(0,0,0,0);
     app.request.post(API_SERVER + "history/today_checkin", {
         account: {
             nrp: account[0], token: account[1]
         }
     }, 
     function(data, status, xhr) {
-        //data = JSON.parse(data);
         if (data.status == "error") {
             app.dialog.alert(data.desc, "Error"); return;
         } else if (data.status == "success") {
             $$('#cp-list > ul > li').each(function(index,el) {
-                //console.log($$(el).data('id'));
                 if (data.passed_cp.find(arr => arr.cp_id == $$(el).data('id')) == null)
                     $$('#cp-list > ul > li[data-id="'+ $$(el).data('id') +'"] .item-side i').removeClass('active');
                 else
                     $$('#cp-list > ul > li[data-id="'+ $$(el).data('id') +'"] .item-side i').addClass('active');
             });
-            /*for (var index in data.passed_cp) {
-                $$('#cp-list > ul > li[data-id="'+ data.passed_cp[index].cp_id +'"] .item-side i').addClass('active');
-            }*/
         }
     }, function(xhr, status) {
         console.log(xhr);
@@ -739,5 +844,3 @@ $$(document).on("page:reinit", ".page[data-name=\"check-in\"]", async function(e
 $$(document).on("click", "#back", function() {
     app.views.main.router.back({ignoreCache: false});
 });
-
-//document.addEventListener('backbutton', onBack, false);

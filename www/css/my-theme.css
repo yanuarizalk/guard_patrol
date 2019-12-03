@@ -11,6 +11,9 @@
     --f7-dialog-input-bg-color: darksalmon;
     --f7-navbar-inner-padding-left: 10px;
     --f7-dialog-input-border-color: darksalmon;
+    --f7-popover-bg-color: lightsalmon;
+    --f7-input-text-color: rgba(120, 50, 0, 0.8);
+    /*--f7-dialog-bg-color: darksalmon;*/
 }
 
 .color-theme-mine {

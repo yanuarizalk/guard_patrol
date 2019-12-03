@@ -32,6 +32,12 @@ var routes = [
     {path: "/manage", url: "./pages/manage.html", options: {
         transition: 'f7-parallax'
     }},
+    {path: "/users", url: "./pages/users.html", options: {
+        transition: 'f7-push'
+    }},
+    {path: "/checkpoints", url: "./pages/cp.html", options: {
+        transition: 'f7-parallax'
+    }},
     {path: "/about", url: "./pages/about.html", options: {
         transition: 'f7-parallax'
     }}

@@ -164,6 +164,12 @@ table.dataTable thead th {
     color: saddlebrown !important;
 }
 
+.dialog.dialog-nopad .dialog-inner {
+    --f7-dialog-inner-padding: 24px 0 0 0;
+}
+.dialog.dialog-nopad .dialog-inner .dialog-title {
+    padding: 0 24px;
+}
 .dialog .dialog-inner {
     background-color: darksalmon;
     border-bottom: 0;

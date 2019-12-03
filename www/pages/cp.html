@@ -1,11 +1,11 @@
-<div class="page" data-name="users">
+<div class="page" data-name="checkpoints">
     <div class="navbar">
         <div class="navbar-bg"></div>
         <div class="navbar-inner">
             <div class="left"><i class="f7-icons ripple" id="back">arrow_left</i></div>
-            <div class="title">Users</div>
+            <div class="title">Checkpoints</div>
             <div class="right menu">
-                <i class="f7-icons link" id="new-user">person_crop_circle_fill_badge_plus</i>
+                <i class="f7-icons link" id="new-cp">plus_circle_fill</i>
                 <i class="f7-icons link" id="filter_search">search_circle_fill</i>
             </div>
         </div>
@@ -16,29 +16,25 @@
                 <ul>
                     <li class="item-content item-input">
                         <div class="item-inner">
-                            <div class="item-title item-label">NRP</div>
-                            <div class="item-input-wrap">
-                                <input name="nrp" type="text" placeholder="ID Card Number" minlength="8" maxlength="8" required />
-                            </div>
-                        </div>
-                    </li>
-                    <li class="item-content item-input">
-                        <div class="item-inner">
                             <div class="item-title item-label">Name</div>
                             <div class="item-input-wrap">
-                                <input name="name" type="text" placeholder="User Name" maxlength="100" required />
+                                <input name="name" type="text" placeholder="Area Name" maxlength="100" required />
                             </div>
                         </div>
                     </li>
                     <li class="item-content item-input">
                         <div class="item-inner">
-                            <div class="item-title item-label">Level</div>
+                            <div class="item-title item-label">Description</div>
                             <div class="item-input-wrap">
-                                <select name="level" id="" required>
-                                    <option value="0">Security</option>
-                                    <option value="1">Manager</option>
-                                    <option value="2">Admin</option>
-                                </select>
+                                <input name="desc" type="text" placeholder="Area Description" maxlength="100" />
+                            </div>
+                        </div>
+                    </li>
+                    <li class="item-content item-input">
+                        <div class="item-inner">
+                            <div class="item-title item-label">Background Color</div>
+                            <div class="item-input-wrap">
+                                <input type="text" name="bg-color" placeholder="Background Color of Area's polygon" readonly>
                             </div>
                         </div>
                     </li>
@@ -50,20 +46,12 @@
             <div class="popover-inner">
                 <div class="list">
                     <ul>
-                        <li class="item-content item-link" id="edit-user">
+                        <li class="item-content item-link" id="edit-cp">
                             <div class="item-media">
                                 <i class="f7-icons">square_pencil</i>
                             </div>
                             <div class="item-inner">
                                 Edit
-                            </div>
-                        </li>
-                        <li class="item-content item-link" id="unreg-user">
-                            <div class="item-media">
-                                <i class="f7-icons">person_crop_circle_badge_xmark</i>
-                            </div>
-                            <div class="item-inner">
-                                Unregister
                             </div>
                         </li>
                         <li class="item-content item-link" id="remove-user">
@@ -78,17 +66,10 @@
                 </div>
             </div>
         </div>
-        <table id="viewer" class="table-viewer">
-            <thead>
-                <tr>
-                    <th width="30%">NRP</th>
-                    <th width="40%">Name</th>
-                    <th width="30%">Level</th>
-                </tr>
-            </thead>
-            <tbody>
-            </tbody>
-        </table>
+        
+        <div class="list custom-cp" id="cp-list">
+            <ul></ul>
+        </div>
 
         <style>
             table.table-viewer tbody tr {
