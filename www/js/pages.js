@@ -55,13 +55,13 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             break;
         }
         case "check-in": {
-            function is_finished() {
+            /*function is_finished() {
                 if ($$('#cp-list > ul > li .item-side i.active').length
                     >=
                     $$('#cp-list > ul > li .item-side i').length)
                     return true;
                 else return false;
-            }
+            }*/
 
             app.preloader.show();
             app.request.post(API_SERVER + "checkpoint", null, 
@@ -74,6 +74,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     var amount = data.amount;
                     for (var index in data.checkpoints) {
                         var cp = data.checkpoints[index];
+                        if (cp.active != 1) continue;
                         var html = 
 '<li data-id="'+ cp.id +'" data-lat="'+ cp.latitude +'" data-lng="'+ cp.longitude +'">' +
     '<a href="#" class="item-content item-link">' +
@@ -96,7 +97,6 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
 
             app.request.post(API_SERVER + "use_method", null, 
             function(data, status, xhr) {
-                //data = JSON.parse(data);
                 if (data.status == "error") {
                     app.dialog.alert(data.desc, "Error"); return;
                 } else if (data.status == "success") {
@@ -124,10 +124,10 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 app.views.main.router.navigate("/map");
             });
             $$("#check").on("click", function(ev) {
-                if (is_finished()) {
+                /*if (is_finished()) {
                     app.dialog.alert("You have finished the route today! Please, take care of your body!", "Error");
                     return;
-                }
+                }*/
                 switch ($$(this).data("method").toUpperCase()) {
                     case "COMMON": {
                         app.views.main.router.navigate("/check_common");
@@ -150,10 +150,10 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     app.dialog.alert("You haven't passed 1 route yet", "Error");
                     return;
                 }
-                if (is_finished()) {
+                /*if (is_finished()) {
                     app.dialog.alert("You can't restart/revert if you have finished the route", "Error");
                     return;
-                }
+                }*/
                 var confirm = await new Promise(function(res, rej) {
                     app.dialog.confirm("Are you sure, want to start from zero again?<br><i style='font-size:12px;'>This action can't be undone & your history checkpoint for today will be removed permanently</i>", "Restart Confirmation", 
                     function() { res(true); }, function() { res(false); });
@@ -171,7 +171,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     if (data.status == "error") {
                         app.dialog.alert(data.desc, "Error"); return;
                     } else if (data.status == "success") {
-                        app.dialog.alert("Your patrol history for today have been restarted!", "Checkpoint Restarted");
+                        app.dialog.alert("Your patrol history have been restarted!", "Checkpoint Restarted");
                         init_today_cp();
                     }
                 }, function(xhr, status) {
@@ -185,10 +185,10 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     app.dialog.alert("You haven't passed 1 route yet", "Error");
                     return;
                 }
-                if (is_finished()) {
+                /*if (is_finished()) {
                     app.dialog.alert("You can't restart/revert if you have finished the route", "Error");
                     return;
-                }
+                }*/
                 var confirm = await new Promise(function(res, rej) {
                     app.dialog.confirm("Are you sure, want to revert back to the last checkpoint?<br><i style='font-size:12px;'>This action can't be undone & your history of last checkpoint will be removed permanently</i>", "Revert Confirmation", 
                     function() { res(true); }, function() { res(false); });
@@ -807,7 +807,39 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
 
             break;
         }
-
+        case "checkpoints": {
+            app.preloader.show();
+            app.request.post(API_SERVER + "checkpoint", null, 
+            function(data, status, xhr) {
+                app.preloader.hide();
+                if (data.status == "error") {
+                    app.dialog.alert(data.desc, "Error"); return;
+                } else if (data.status == "success") {
+                    var amount = data.amount;
+                    for (var index in data.checkpoints) {
+                        var cp = data.checkpoints[index];
+                        var html = 
+'<li data-id="'+ cp.id +'" data-lat="'+ cp.latitude +'" data-lng="'+ cp.longitude +'">' +
+    '<a href="#" class="item-content item-link">' +
+        '<div class="item-inner">' +
+            '<div class="item-title">'+ cp.name +'</div>' +
+        '</div>' +
+        '<div class="item-side">' +
+            '<i class="f7-icons '+ (cp.active == 1 ? 'active' : '') +'">circle_fill</i>' +
+        '</div>' +
+        '<div class="sortable-handler"></div>' +
+    '</a>' +
+'</li>';
+                        $$('#cp-list > ul').append(html);
+                    }
+                }
+            }, function(xhr, status) {
+                app.preloader.hide();
+                app.dialog.alert("Error while fetching data to the server.", "Unexpected Server Error");
+                console.log(xhr);
+            }, "json");
+            break;
+        }
 
         default: break;
     }
