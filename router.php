@@ -92,7 +92,11 @@
         $res = $res->withHeader('Content-Type', 'application/json')
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
-        $db['query'] = $db['conn'] -> prepare("SELECT id, name, latitude, longitude FROM checkpoint WHERE active = 1");
+        $db['query'] = $db['conn'] -> prepare(
+            "SELECT 
+                id, name, latitude, longitude, active
+            FROM checkpoint 
+            /*WHERE active = 1*/");
         if (!$db['query']->execute()) return errQuery($res);
         $db['res'] = $db['query']->fetchAll(PDO::FETCH_ASSOC);
         $res->getBody()->write(json_encode([
@@ -225,7 +229,8 @@
         }
 
         $db['query'] = $db['conn'] -> prepare(
-            "INSERT INTO history VALUES(null, :cp_id, :user_nrp, :remark, :dt, :lat, :lng, :method)"
+            "INSERT INTO history 
+            VALUES(null, :cp_id, :user_nrp, :remark, :dt, :lat, :lng, :method, 0)"
         );
         if (!$db['query']->execute([
             ':cp_id' => $cur_cp['id'],
@@ -244,8 +249,15 @@
         }
 
         $cur_cp = current_checkpoint($data['account']['nrp'], true);
-        if ($cur_cp === 0)
-            $res->getBody()->write(json_encode(["status" => "success", "desc" => "You have finished the route! Good work for today!"]));
+        if ($cur_cp === 0) {
+            $db['query'] = $db['conn'] -> prepare(
+                "UPDATE history SET is_finished = 1 WHERE user_nrp = :nrp"
+            );
+            if (!$db['query']->execute([
+                ':nrp' => $data['account']['nrp']
+            ])) return errQuery($res);
+            $res->getBody()->write(json_encode(["status" => "success", "desc" => "Congrats! You have finished the route!"]));
+        }
         else {
             $res->getBody()->write(json_encode([
                 "status" => "success", "desc" => "The next checkpoint is <b>".$cur_cp['name']."</b>"
@@ -373,14 +385,11 @@
             FROM history 
             INNER JOIN checkpoint ON cp_id = checkpoint.id
             WHERE cp_id < :current_cp AND 
-                checkpoint.active = 1 AND
-                dt >= :min_dt AND dt < :max_dt AND user_nrp = :nrp
-            "
+                checkpoint.active = 1 AND user_nrp = :nrp AND
+                is_finished = 0"
         );
-        if (!$db['query']->execute([    // Assume it as infinity beyondddd!!!!
-            ':current_cp' => $cur_cp === 0 ? 10000000000 : $cur_cp,
-            ':min_dt' => $minDt,
-            ':max_dt' => $maxDt,
+        if (!$db['query']->execute([
+            ':current_cp' => $cur_cp,
             ':nrp' => $data['account']['nrp']
         ])) return errQuery($res);
         $db['res'] = $db['query'] -> fetchAll(PDO::FETCH_ASSOC);
@@ -413,15 +422,13 @@
         $query = strtolower($data['time']) == "last" ? 
             "DELETE
             FROM history
-            WHERE dt >= :min_dt AND dt < :max_dt AND user_nrp = :nrp
+            WHERE is_finished = 0 AND user_nrp = :nrp
             ORDER BY id DESC LIMIT 1" : 
             "DELETE
             FROM history 
-            WHERE dt >= :min_dt AND dt < :max_dt AND user_nrp = :nrp";
+            WHERE is_finished = 0 AND user_nrp = :nrp";
         $db['query'] = $db['conn'] -> prepare($query);
         if (!$db['query']->execute([
-            ':min_dt' => $minDt,
-            ':max_dt' => $maxDt,
             ':nrp' => $data['account']['nrp']
         ])) return errQuery($res);
         $res->getBody()->write(json_encode([

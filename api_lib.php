@@ -52,10 +52,15 @@
         global $db;
         $minDay = strtotime("today");
         $maxDay = strtotime("today") + 86400;
-        $temp['query'] = $db['conn'] -> prepare("SELECT id, cp_id, dt FROM history WHERE user_nrp = :nrp AND dt >= :minDate AND dt < :maxDate ORDER BY cp_id");
+        $temp['query'] = $db['conn'] -> prepare(
+            "SELECT 
+                id, cp_id, dt 
+            FROM history 
+            WHERE user_nrp = :nrp AND is_finished = 0
+            ORDER BY cp_id"
+        );
         if (!$temp['query']->execute([
-            ':nrp' => $nrp,
-            ':minDate' => $minDay, ':maxDate' => $maxDay
+            ':nrp' => $nrp
         ])) return false;
         
         $passed = $temp['query'] -> rowCount();
@@ -126,6 +131,6 @@
     }
     function errReqData($res) {
         global $db;
-        
+
     }
 ?>
