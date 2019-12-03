@@ -30,15 +30,7 @@
         $db['query'] = $db['conn'] -> prepare("SELECT level, is_used FROM users WHERE nrp = :nrp");
         if (!$db['query']->execute([
             ':nrp' => $data["nrp"]
-        ])) {
-            $res->getBody()->write(json_encode([
-                "status" => "error", 
-                "desc" => "Error occured while querying on database",
-                "error" => $db['conn'] -> errorInfo(),
-                "code" => $db['conn'] -> errorCode()
-            ]));
-            return $res;
-        }
+        ])) return errQuery($res);
         if ($db['query'] -> rowCount() < 1) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Invalid ID!"]));
             return $res;
@@ -49,19 +41,12 @@
             return $res;
         }
         $token = getToken(255);
-        $db['query'] = $db['conn'] -> prepare("UPDATE users SET is_used = 1, registration_date = :now, token = :token");
+        $db['query'] = $db['conn'] -> prepare("UPDATE users SET is_used = 1, registration_date = :now, token = :token WHERE nrp = :nrp");
         if (!$db['query'] -> execute([
             ':now' => strtotime("now"),
-            ':token' => $token
-        ]) ) {
-            $res->getBody()->write(json_encode([
-                "status" => "error", 
-                "desc" => "Error occured while querying on database",
-                "error" => $db['conn'] -> errorInfo(),
-                "code" => $db['conn'] -> errorCode()
-            ]));
-            return $res;
-        }
+            ':token' => $token,
+            ':nrp' => $data['nrp']
+        ]) ) return errQuery($res);
         $res->getBody()->write(json_encode(["status" => "success", "token" => $token, "level" => $db['res']['level']]));
         return $res;
     });
@@ -81,15 +66,7 @@
         $db['query'] = $db['conn'] -> prepare("SELECT is_used, token FROM users WHERE nrp = :nrp");
         if (!$db['query']->execute([
             ':nrp' => $data["nrp"]
-        ])) {
-            $res->getBody()->write(json_encode([
-                "status" => "error", 
-                "desc" => "Error occured while querying on database",
-                "error" => $db['conn'] -> errorInfo(),
-                "code" => $db['conn'] -> errorCode()
-            ]));
-            return $res;
-        }
+        ])) return errQuery($res);
         if ($db['query'] -> rowCount() < 1) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Invalid ID!"]));
             return $res;
@@ -116,15 +93,7 @@
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
         $db['query'] = $db['conn'] -> prepare("SELECT id, name, latitude, longitude FROM checkpoint WHERE active = 1");
-        if (!$db['query']->execute()) {
-            $res->getBody()->write(json_encode([
-                "status" => "error", 
-                "desc" => "Error occured while fetching on database",
-                "error" => $db['conn'] -> errorInfo(),
-                "code" => $db['conn'] -> errorCode()
-            ]));
-            return $res;
-        }
+        if (!$db['query']->execute()) return errQuery($res);
         $db['res'] = $db['query']->fetchAll(PDO::FETCH_ASSOC);
         $res->getBody()->write(json_encode([
             "status" => "success", "checkpoints" => $db['res'],
@@ -152,15 +121,7 @@
         );
         if (!$db['query']->execute([
             ':id' => $query['id']
-        ])) {
-            $res->getBody()->write(json_encode([
-                "status" => "error", 
-                "desc" => "An Error occured while fetching data from the database",
-                "error" => $db['conn'] -> errorInfo(),
-                "code" => $db['conn'] -> errorCode()
-            ]));
-            return $res;
-        }
+        ])) return errQuery($res);
         if ($db['query'] -> rowCount() < 1) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "ID not found!"]));
             return $res;
@@ -215,15 +176,7 @@
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
         $db['query'] = $db['conn'] -> prepare("SELECT id, name, region, color, latitude, longitude, description, mark_icon FROM checkpoint WHERE active = 1");
-        if (!$db['query']->execute()) {
-            $res->getBody()->write(json_encode([
-                "status" => "error", 
-                "desc" => "Error occured while fetching on database",
-                "error" => $db['conn'] -> errorInfo(),
-                "code" => $db['conn'] -> errorCode()
-            ]));
-            return $res;
-        }
+        if (!$db['query']->execute()) return errQuery($res);
         $db['res'] = $db['query']->fetchAll(PDO::FETCH_ASSOC);
 
         $res->getBody()->write(json_encode([
@@ -249,7 +202,7 @@
         global $db;
         
         $method = get_method();
-        $method = $method == "COMMON" ? 1 : 0;
+        $method = ($method == "COMMON" ? 1 : 0);
 
         $data = $req->getParsedBody();
         $res = $res->withHeader('Content-Type', 'application/json')
@@ -282,15 +235,7 @@
             ':lat' => $data['coor']['lat'],
             ':lng' => $data['coor']['lng'],
             ':method' => $method
-        ])) {
-            $res->getBody()->write(json_encode([
-                "status" => "error", 
-                "desc" => "An Error occured while inserting data to the database",
-                "error" => $db['conn'] -> errorInfo(),
-                "code" => $db['conn'] -> errorCode()
-            ]));
-            return $res;
-        }
+        ])) return errQuery($res);
         $lastId = $db['conn'] -> lastInsertId();
 
         if ($method == 0) {
@@ -353,13 +298,7 @@
         if (!$db['query']->execute([
             ':minDate' => $minDate,
             ':maxDate' => $maxDate
-        ])) {
-            $res->getBody()->write(json_encode([
-                "status" => "error", "desc" => "Error occured while fetching on database",
-                "error" => $db['conn'] -> errorInfo(), "code" => $db['conn'] -> errorCode()
-            ]));
-            return $res;
-        }
+        ])) return errQuery($res);
         $total_unfiltered = $db['query'] -> fetch(PDO::FETCH_ASSOC)['total'];
         $db['query'] = $db['conn'] -> prepare(
             "SELECT 
@@ -378,15 +317,7 @@
             ':minDate' => $minDate,
             ':maxDate' => $maxDate,
             ':search' => '%'.$search.'%'
-        ])) {
-            $res->getBody()->write(json_encode([
-                "status" => "error", 
-                "desc" => "Error occured while fetching on database",
-                "error" => $db['conn'] -> errorInfo(),
-                "code" => $db['conn'] -> errorCode()
-            ]));
-            return $res;
-        }
+        ])) return errQuery($res);
         $db['res'] = $db['query']->fetchAll(PDO::FETCH_ASSOC);
         $out = [];
         foreach($db['res'] as $index => $val) {
@@ -411,8 +342,7 @@
             "status" => "success", "draw" => intval($draw),
             "recordsTotal" => $total_unfiltered - $db['query'] -> rowCount(),
             "recordsFiltered" => $db['query'] -> rowCount(),
-            "data" => $out, "test" => $db['res'], 
-            "order_by" => $order_by, "order_as" => $order_as
+            "data" => $out
         ]));
         return $res;
     });
@@ -442,25 +372,17 @@
                 cp_id
             FROM history 
             INNER JOIN checkpoint ON cp_id = checkpoint.id
-            WHERE ".($cur_cp === 0 ? "" : "cp_id < :current_cp AND ")."
+            WHERE cp_id < :current_cp AND 
                 checkpoint.active = 1 AND
                 dt >= :min_dt AND dt < :max_dt AND user_nrp = :nrp
             "
         );
-        if (!$db['query']->execute([
-            ':current_cp' => $cur_cp,
+        if (!$db['query']->execute([    // Assume it as infinity beyondddd!!!!
+            ':current_cp' => $cur_cp === 0 ? 10000000000 : $cur_cp,
             ':min_dt' => $minDt,
             ':max_dt' => $maxDt,
             ':nrp' => $data['account']['nrp']
-        ])) {
-            $res->getBody()->write(json_encode([
-                "status" => "error", 
-                "desc" => "An Error occured while fetching data from the database",
-                "error" => $db['conn'] -> errorInfo(),
-                "code" => $db['conn'] -> errorCode()
-            ]));
-            return $res;
-        }
+        ])) return errQuery($res);
         $db['res'] = $db['query'] -> fetchAll(PDO::FETCH_ASSOC);
         $res->getBody()->write(json_encode([
             "status" => "success",
@@ -501,15 +423,7 @@
             ':min_dt' => $minDt,
             ':max_dt' => $maxDt,
             ':nrp' => $data['account']['nrp']
-        ])) {
-            $res->getBody()->write(json_encode([
-                "status" => "error", 
-                "desc" => "An Error occured while fetching data from the database",
-                "error" => $db['conn'] -> errorInfo(),
-                "code" => $db['conn'] -> errorCode()
-            ]));
-            return $res;
-        }
+        ])) return errQuery($res);
         $res->getBody()->write(json_encode([
             "status" => "success"
         ]));
@@ -543,15 +457,7 @@
         );
         if (!$db['query']->execute([
             ':history_id' => $data['id']
-        ])) {
-            $res->getBody()->write(json_encode([
-                "status" => "error", 
-                "desc" => "An Error occured while inserting data to the database",
-                "error" => $db['conn'] -> errorInfo(),
-                "code" => $db['conn'] -> errorCode()
-            ]));
-            return $res;
-        }
+        ])) return errQuery($res);
         $db['res'] = $db['query'] -> fetch(PDO::FETCH_ASSOC);
         $res->getBody()->write(json_encode([
             "status" => "success", "remark" => htmlspecialchars($db['res']['remark']),
@@ -559,6 +465,238 @@
             "by" => '<b>'.$db['res']['user_name'].'</b> ('.substr_replace($db['res']['user_nrp'], '-', 6, 0).')',
             "lat" => $db['res']['latitude'],
             "lng" => $db['res']['longitude']
+        ]));
+        return $res;
+    });
+
+    $app->post('/settings/switch_mode', function($req, $res, $args) {
+        global $db;
+
+        $data = $req->getParsedBody();
+        $res = $res->withHeader('Content-Type', 'application/json')
+            ->withHeader('Access-Control-Allow-Origin', '*')
+            ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
+
+        if (!isset($data['account']['nrp'], $data['account']['token'])) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
+            return $res;
+        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
+            return $res;
+        }
+        
+        $method = get_method();
+        $db['query'] = $db['conn'] -> prepare(
+            "INSERT INTO settings VALUES(\"Q_CHECKIN_METHOD\", :val)"
+        );
+        if (!$db['query']->execute([
+            ':val' => $method == "CLASSIC" ? "COMMON" : "CLASSIC"
+        ])) return errQuery($res);
+        $res->getBody()->write(json_encode([
+            "status" => "success"
+        ]));
+        return $res;
+    });
+
+
+    $app->post('/users/dt', function($req, $res, $args) {
+        global $db;
+
+        $data = $req->getParsedBody();
+        $res = $res->withHeader('Content-Type', 'application/json')
+            ->withHeader('Access-Control-Allow-Origin', '*')
+            ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
+
+        if (!isset(
+            $data['account']['nrp'], $data['account']['token'],
+            $data['draw'], $data['order'][0], $data['search']['value']
+        )) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
+            return $res;
+        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
+            return $res;
+        }
+        $draw = $data['draw'];
+        $order_by = $data['order'][0]['column'];
+        $order_as = $data['order'][0]['dir'];
+        $search = $data['find'];
+
+        switch($order_by) {
+            case 1: $order_by = 'name'; break;
+            case 2: $order_by = 'registration_date'; break;
+            case 0: 
+            default: $order_by = 'nrp'; break;
+        }
+        switch ($order_as) {
+			case 'desc': $order_as = 'desc'; break;
+			case 'asc':
+			default: $order_as = 'asc'; break;
+		}
+        $db['query'] = $db['conn'] -> prepare(
+            "SELECT COUNT(*) AS total FROM users"
+        );
+        if (!$db['query']->execute()) return errQuery($res);
+        $total_unfiltered = $db['query'] -> fetch(PDO::FETCH_ASSOC)['total'];
+        $db['query'] = $db['conn'] -> prepare(
+            "SELECT 
+                nrp, name, level, is_used, registration_date
+            FROM users
+            WHERE 
+                nrp LIKE :search OR name LIKE :search
+            ORDER BY ".$order_by." ".$order_as
+        );
+        if (!$db['query']->execute([
+            ':search' => '%'.$search.'%'
+        ])) return errQuery($res);
+        $db['res'] = $db['query']->fetchAll(PDO::FETCH_ASSOC);
+        $out = [];
+        foreach($db['res'] as $index => $val) {
+            array_push($out, [
+                'DT_RowData' => [
+                    'is_used' => $val['is_used'],
+                    'registration_date' => $val['registration_date'] * 1000,
+                    'name' => $val['name'],
+                    'nrp' => $val['nrp'],
+                    'level' => $val['level']
+                ],
+                'name' => $val['name'],
+                'nrp' => $val['nrp'],
+                'level' => $val['level']
+            ]);
+        }
+
+        $res->getBody()->write(json_encode([
+            "status" => "success", "draw" => intval($draw),
+            "recordsTotal" => $total_unfiltered - $db['query'] -> rowCount(),
+            "recordsFiltered" => $db['query'] -> rowCount(),
+            "data" => $out
+        ]));
+        return $res;
+    });
+
+    $app->post('/users/new', function($req, $res, $args) {
+        global $db;
+        $data = $req->getParsedBody();
+        $res = $res->withHeader('Content-Type', 'application/json')
+            ->withHeader('Access-Control-Allow-Origin', '*')
+            ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
+        if (!isset($data['input']['nrp'], $data['input']['name'], $data['input']['level'], $data['account']['nrp'], $data['account']['token'])) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
+            return $res;
+        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
+            return $res;
+        }
+        $db['query'] = $db['conn'] -> prepare(
+            "INSERT INTO users VALUES(:nrp, :name, :level, 0, unix_timestamp(), \"\")"
+        );
+        if (!$db['query']->execute([
+            ':nrp' => str_replace('-','', $data['input']['nrp']),
+            ':name' => $data['input']['name'],
+            ':level' => $data['input']['level']
+        ])) return errQuery($res);
+        $res->getBody()->write(json_encode([
+            "status" => "success"
+        ]));
+        return $res;
+    });
+
+    $app->post('/users/edit', function($req, $res, $args) {
+        global $db;
+        $data = $req->getParsedBody();
+        $res = $res->withHeader('Content-Type', 'application/json')
+            ->withHeader('Access-Control-Allow-Origin', '*')
+            ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
+        if (!isset($data['input']['nrp'], $data['input']['name'], $data['input']['level'], $data['previous_data'], $data['account']['nrp'], $data['account']['token'])) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
+            return $res;
+        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
+            return $res;
+        }
+        $db['query'] = $db['conn'] -> prepare(
+            "UPDATE users SET nrp = :nrp, name = :name, level = :level WHERE nrp = :prev_nrp"
+        );
+        if (!$db['query']->execute([
+            ':nrp' => str_replace('-','', $data['input']['nrp']),
+            ':name' => $data['input']['name'],
+            ':level' => $data['input']['level'],
+            ':prev_nrp' => $data['previous_data']
+        ])) return errQuery($res);
+        if (str_replace('-','', $data['input']['nrp']) != $data['previous_data']) {
+            $db['query'] = $db['conn'] -> prepare(
+                "UPDATE history SET user_nrp = :nrp WHERE user_nrp = :prev_nrp"
+            );
+            if (!$db['query']->execute([
+                ':nrp' => str_replace('-','', $data['input']['nrp']),
+                ':prev_nrp' => $data['previous_data']
+            ])) return errQuery($res);
+        }
+        $res->getBody()->write(json_encode([
+            "status" => "success"
+        ]));
+        return $res;
+    });
+
+    $app->post('/users/remove', function($req, $res, $args) {
+        global $db;
+        $data = $req->getParsedBody();
+        $res = $res->withHeader('Content-Type', 'application/json')
+            ->withHeader('Access-Control-Allow-Origin', '*')
+            ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
+        if (!isset($data['nrp'], $data['account']['nrp'], $data['account']['token'])) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
+            return $res;
+        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
+            return $res;
+        }
+        $db['query'] = $db['conn'] -> prepare(
+            "DELETE FROM users WHERE nrp = :nrp"
+        );
+        if (!$db['query']->execute([
+            ':nrp' => $data['nrp']
+        ])) return errQuery($res);
+        $db['query'] = $db['conn'] -> prepare(
+            "DELETE FROM history WHERE user_nrp = :nrp"
+        );
+        if (!$db['query']->execute([
+            ':nrp' => $data['nrp']
+        ])) return errQuery($res);
+        $res->getBody()->write(json_encode([
+            "status" => "success"
+        ]));
+        return $res;
+    });
+
+    $app->post('/users/unreg', function($req, $res, $args) {
+        global $db;
+        $data = $req->getParsedBody();
+        $res = $res->withHeader('Content-Type', 'application/json')
+            ->withHeader('Access-Control-Allow-Origin', '*')
+            ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
+        if (!isset($data['nrp'], $data['account']['nrp'], $data['account']['token'])) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
+            return $res;
+        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
+            return $res;
+        }
+        $db['query'] = $db['conn'] -> prepare(
+            "UPDATE users SET is_used = 0 WHERE nrp = :nrp"
+        );
+        if (!$db['query']->execute([
+            ':nrp' => $data['nrp']
+        ])) return errQuery($res);
+        $res->getBody()->write(json_encode([
+            "status" => "success"
         ]));
         return $res;
     });

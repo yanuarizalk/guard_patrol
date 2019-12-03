@@ -108,4 +108,24 @@
     function picSave($filename, $b64) {
         return file_put_contents(__DIR__.'/'.$filename, base64_decode($b64), FILE_APPEND);
     }
+
+
+    function errQuery($res/*, $state*/) {
+        global $db;
+        $res->getBody()->write(json_encode([
+            "status" => "error", 
+            "desc" => "An Error occured while processing data",
+            "error" => $db['conn'] -> errorInfo(),
+            "code" => $db['conn'] -> errorCode()
+        ]));
+        return $res;
+    }
+    function errUnAuthorized($res) {
+        global $db;
+
+    }
+    function errReqData($res) {
+        global $db;
+        
+    }
 ?>

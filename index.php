@@ -1,4 +1,6 @@
 <?php
+    error_reporting(E_ALL);
+
     use Slim\Factory\AppFactory;
     use Slim\Middleware\OutputBufferingMiddleware; 
 
