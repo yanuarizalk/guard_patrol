@@ -46,8 +46,11 @@ body {
     --f7-appbar-height: 0px;
 }
 
-.navbar .navbar-inner .menu > .link {
-    margin: 0 8px;
+.navbar .navbar-inner .menu .link:last-child {
+    margin-right: 8px;
+}
+.navbar .navbar-inner .menu .link {
+    margin: 0 4px;
     font-size: 24pt;
 }
 
@@ -135,6 +138,9 @@ body {
 .list.custom-cp .item-side {
     width: var(--custom-cp-list-mark-width);
 }
+/*.list.custom-cp .item-side*/.none {
+    display: none;
+}
 .list.custom-cp .item-side i {
     color: red;
     text-shadow: 1px 1px 1px darkred;
@@ -183,6 +189,9 @@ table.dataTable thead th {
 .dialog .dialog-buttons .dialog-button {
     text-align: center !important;
     color: inherit;
+}
+.dialog .dialog-inner form.list ul {
+    --f7-list-bg-color: darksalmon;
 }
 /*.dialog .dialog-inner .dialog-input-field.input-focused:not(.input-outline):after, .md .item-input-focused:not(.item-input-outline) .item-input-wrap:after*/
 /*.accordion-list.custom-cp .accordion-item-opened {

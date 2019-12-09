@@ -5,8 +5,15 @@
             <div class="left"><i class="f7-icons ripple" id="back">arrow_left</i></div>
             <div class="title">Checkpoints</div>
             <div class="right menu">
-                <i class="f7-icons link" id="new-cp">plus_circle_fill</i>
-                <i class="f7-icons link" id="filter_search">search_circle_fill</i>
+                <div id="mnu-primary">
+                    <i class="f7-icons link" id="map_editor-cp">pencil_outline</i>
+                    <i class="f7-icons link" id="order-cp">square_stack_3d_up_fill</i>
+                    <i class="f7-icons link" id="new-cp">plus_circle_fill</i>
+                </div>
+                <div id="mnu-order" class="none">
+                    <i class="f7-icons link" id="order-save-cp">checkmark_circle_fill</i>
+                    <i class="f7-icons link" id="order-cancel-cp">xmark_circle_fill</i>
+                </div>
             </div>
         </div>
     </div>
@@ -22,26 +29,42 @@
                             </div>
                         </div>
                     </li>
-                    <li class="item-content item-input">
+                    <!--li class="item-content item-input">
                         <div class="item-inner">
                             <div class="item-title item-label">Description</div>
                             <div class="item-input-wrap">
                                 <input name="desc" type="text" placeholder="Area Description" maxlength="100" />
                             </div>
                         </div>
+                    </li-->
+                    <li class="item-content item-input">
+                        <div class="item-inner">
+                            <div class="item-title item-label">Route</div>
+                            <div class="item-input-wrap">
+                                <input name="route" type="text" placeholder="Area Route" required>
+                            </div>
+                        </div>
                     </li>
                     <li class="item-content item-input">
                         <div class="item-inner">
-                            <div class="item-title item-label">Background Color</div>
+                            <div class="item-title item-label">State</div>
                             <div class="item-input-wrap">
-                                <input type="text" name="bg-color" placeholder="Background Color of Area's polygon" readonly>
+                                <label class="item-checkbox item-content">
+                                    <input name="state" type="checkbox">
+                                    <i class="icon icon-checkbox"></i>
+                                    <div class="item-inner">
+                                        <div class="item-title">
+                                            Enabled
+                                        </div>
+                                    </div>
+                                </label>
                             </div>
                         </div>
                     </li>
                 </ul>
             </form>
         </div>
-        <div class="popover" id="ctx-user">
+        <div class="popover" id="ctx-cp">
             <div class="popover-angle"></div>
             <div class="popover-inner">
                 <div class="list">
@@ -54,7 +77,7 @@
                                 Edit
                             </div>
                         </li>
-                        <li class="item-content item-link" id="remove-user">
+                        <li class="item-content item-link" id="remove-cp">
                             <div class="item-media">
                                 <i class="f7-icons">trash_fill</i>
                             </div>
@@ -68,7 +91,7 @@
         </div>
 
         <div class="list custom-cp sortable" id="cp-list">
-            <ul></ul>
+
         </div>
 
         <style>

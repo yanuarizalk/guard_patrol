@@ -1,7 +1,8 @@
 :root {
     --f7-page-bg-color: lightsalmon;
     --f7-appbar-bg-color: darksalmon;
-    --f7-list-bg-color: darksalmon;
+    --f7-list-group-title-bg-color: darksalmon;
+    --f7-list-bg-color: lightsalmon;
     --f7-input-clear-button-color: antiquewhite;
     /*--f7-preloader-modal-bg-color: */
     --f7-navbar-bg-color: darksalmon;

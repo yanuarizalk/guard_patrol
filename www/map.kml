@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Tyfountex Pos Checkpoint</name>
+    <description/>
+    <NetworkLink>
+      <name>Tyfountex Pos Checkpoint</name>
+      <Link>
+        <href><![CDATA[http://www.google.com/maps/d/kml?forcekml=1&mid=1EUJ9UzJxEz3s6ka3n3DwtMSYr4qnrl6T]]></href>
+      </Link>
+    </NetworkLink>
+  </Document>
+</kml>

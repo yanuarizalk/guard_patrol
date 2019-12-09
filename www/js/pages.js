@@ -62,31 +62,65 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     return true;
                 else return false;
             }*/
+            function SelectRoute(text) {
+                return new Promise((res, rej) => {
+                    var routes = [];
+                    $$('#cp-list .list-group').forEach((el) => {
+                        routes.push({
+                            text: $$(el).data('route'),
+                            onClick: () => {
+                                res($$(el).data('route'));
+                            }
+                        })
+                    });
+                    app.dialog.create({
+                        title: 'Select Route',
+                        text: text,
+                        buttons: routes,
+                        verticalButtons: true,
+                        closeByBackdropClick: true,
+                        on: {
+                            closed: function() {
+                                res(false);
+                            }
+                        }
+                    }).open();
+                });
+            }
 
             app.preloader.show();
             app.request.post(API_SERVER + "checkpoint", null, 
             function(data, status, xhr) {
                 app.preloader.hide();
-                //data = JSON.parse(data);
                 if (data.status == "error") {
                     app.dialog.alert(data.desc, "Error"); return;
                 } else if (data.status == "success") {
                     var amount = data.amount;
-                    for (var index in data.checkpoints) {
-                        var cp = data.checkpoints[index];
-                        if (cp.active != 1) continue;
-                        var html = 
-'<li data-id="'+ cp.id +'" data-lat="'+ cp.latitude +'" data-lng="'+ cp.longitude +'">' +
-    '<a href="#" class="item-content item-link">' +
-        '<div class="item-inner">' +
-            '<div class="item-title">'+ cp.name +'</div>' +
-        '</div>' +
-        '<div class="item-side">' +
-            '<i class="f7-icons">flag_fill</i>' +
-        '</div>' +
-    '</a>' +
-'</li>';
-                        $$('#cp-list > ul').append(html);
+                    for (var gIndex in data.checkpoints) {
+                        if (gIndex == "") continue;
+                        $$('#cp-list').append(
+                            '<div class="list-group" data-route="'+ gIndex +'"><ul>' +
+                                '<li class="list-group-title">Area '+ gIndex +'</li>'
+                        );
+                        for (var cpIndex in data.checkpoints[gIndex]) {
+                            var cp = data.checkpoints[gIndex][cpIndex];
+                            if (cp.active != 1) continue;
+                            var html = 
+                            '<li data-id="'+ cp.id +'" data-lat="'+ cp.latitude +'" data-lng="'+ cp.longitude +'">' +
+                                '<a href="#" class="item-content item-link">' +
+                                    '<div class="item-inner">' +
+                                        '<div class="item-title">'+ cp.name +'</div>' +
+                                    '</div>' +
+                                    '<div class="item-side">' +
+                                        '<i class="f7-icons">flag_fill</i>' +
+                                    '</div>' +
+                                '</a>' +
+                            '</li>';
+                            $$('#cp-list > .list-group:last-child > ul').append(html);
+                        }
+                        $$('#cp-list').append(
+                            '</ul></div>'
+                        );
                     }
                 }
             }, function(xhr, status) {
@@ -118,27 +152,24 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 console.log(xhr);
             }, "json");
 
-            init_today_cp();            
+            check_cp();
 
             $$("#show-map").on("click", function(ev) {
                 app.views.main.router.navigate("/map");
             });
-            $$("#check").on("click", function(ev) {
+            $$("#check").on("click", async function(ev) {
                 /*if (is_finished()) {
                     app.dialog.alert("You have finished the route today! Please, take care of your body!", "Error");
                     return;
                 }*/
-                switch ($$(this).data("method").toUpperCase()) {
-                    case "COMMON": {
-                        app.views.main.router.navigate("/check_common");
-                        break;
+                var route = await SelectRoute('Choose which route to take in');
+                if (route === false) return;
+                app.views.main.router.navigate({
+                    name: $$("#check").data("method").toUpperCase() == "COMMON" ? "check_common" : "check_classic",
+                    params: {
+                        route: route
                     }
-                    case "CLASSIC":
-                    default: {
-                        app.views.main.router.navigate("/check_classic");
-                        break;
-                    }
-                }
+                });
             });
             /*$$(document).on("click", "#cp-list > ul > li", function() {
                 var lat = $$(this).data('lat');
@@ -146,8 +177,11 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 app.views.main.router.navigate('/map/?use_ls=1&lat=' + lat + '&lng=' + lng + "&no_marker=1");
             });*/
             $$("#restart").on("click", async function() {
-                if ($$('#cp-list > ul > li .item-side i.active').length < 1) {
-                    app.dialog.alert("You haven't passed 1 route yet", "Error");
+                var route = await SelectRoute('Choose which route to restart');
+                if (route === false) return;
+
+                if ($$('#cp-list > .list-group[data-route="'+ route +'"] li .item-side i.active').length < 1) {
+                    app.dialog.alert("You haven't passed 1 checkpoint yet", "Error");
                     return;
                 }
                 /*if (is_finished()) {
@@ -164,7 +198,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 app.request.post(API_SERVER + "history/restart", {
                     account: {
                         nrp: account[0], token: account[1]
-                    }, time: "all"
+                    }, time: "all", route: route
                 }, 
                 function(data, status, xhr) {
                     app.preloader.hide();
@@ -172,7 +206,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                         app.dialog.alert(data.desc, "Error"); return;
                     } else if (data.status == "success") {
                         app.dialog.alert("Your patrol history have been restarted!", "Checkpoint Restarted");
-                        init_today_cp();
+                        check_cp();
                     }
                 }, function(xhr, status) {
                     app.preloader.hide();
@@ -181,8 +215,11 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 }, "json");
             });
             $$("#revert").on("click", async function() {
-                if ($$('#cp-list > ul > li .item-side i.active').length < 1) {
-                    app.dialog.alert("You haven't passed 1 route yet", "Error");
+                var route = await SelectRoute('Choose which route to restart');
+                if (route === false) return;
+
+                if ($$('#cp-list > .list-group[data-route="'+ route +'"] li .item-side i.active').length < 1) {
+                    app.dialog.alert("You haven't passed 1 checkpoint yet", "Error");
                     return;
                 }
                 /*if (is_finished()) {
@@ -199,7 +236,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 app.request.post(API_SERVER + "history/restart", {
                     account: {
                         nrp: account[0], token: account[1]
-                    }, time: "last"
+                    }, time: "last", route: route
                 }, 
                 function(data, status, xhr) {
                     app.preloader.hide();
@@ -207,7 +244,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                         app.dialog.alert(data.desc, "Error"); return;
                     } else if (data.status == "success") {
                         app.dialog.alert("Your last checkpoint have been reverted!", "Checkpoint Reverted");
-                        init_today_cp();
+                        check_cp();
                     }
                 }, function(xhr, status) {
                     app.preloader.hide();
@@ -218,71 +255,50 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             break;
         }
         case "map": {
-            var map = plugin.google.maps.Map.getMap(document.getElementById("map"));
-            var coor, markers = [];
-            if (page.route.query.use_ls == 1 || page.route.query.use_ls == null) {
-                coor = await new Promise(function(res, rej) {
-                    map.getMyLocation({enableHighAccuracy: true}, function(result) {res(result);}, function(err){res(err);});
-                });
-                if (coor.status === false) {
-                    app.dialog.alert(coor.error_message, "Error");
-                    coor = {latLng: DEFAULT_LOCATION};
-                } else {
-                    var marker = map.addMarker({
-                        title: "You are here",
-                        position: coor.latLng
-                    });
-                    markers.push(marker);
-                    marker.showInfoWindow();
+            var markers = [];
+            var map = plugin.google.maps.Map.getMap(document.getElementById("map"), {
+                controls: {
+                    myLocationButton: true,
+                    myLocation: true
                 }
-            } else {
-                coor = {latLng: DEFAULT_LOCATION};
-            }
+            });
+            var areas = await new Promise((res, rej) => {
+                map.addKmlOverlay({
+                    url: KML_MAP, clickable: true, suppressInfoWindow: true
+                }, function(kml) {
+                    if (kml == null) res(false);
+                    var tAreas = [];
+                    kml.kmlData.getAt(0).getAt(0).forEach(function(el) {
+                        tAreas.push({
+                            name: el.get('name').value,
+                            points: el.get('points')
+                        });
+                    }).then(() => {
+                        res(tAreas);
+                    });
+                });
+            });
+            var coor = DEFAULT_LOCATION;
             if (page.route.query.lat != null && page.route.query.lng != null) {
-                coor = {latLng: {
+                coor = {
                     lat: page.route.query.lat, lng: page.route.query.lng
-                }};
+                };
                 if (page.route.query.no_marker != "1") {
                     var marker = map.addMarker({
                         title: "Security position",
-                        position: coor.latLng,
+                        position: coor,
                         icon: "yellow"
                     });
                     markers.push(marker);
                 }
             }
             map.animateCamera({
-                target: coor.latLng,
+                target: coor,
                 zoom: 18,
                 tilt: 90,
                 bearing: 0,
                 duration: 3000
             });
-            app.request.post(API_SERVER + "regions", null, 
-            function(data, status, xhr) {
-                if (data.status == "error") {
-                    app.dialog.alert(data.desc, "Error"); return;
-                } else if (data.status == "success") {
-                    for (var index in data.regions) {
-                        var poly = map.addPolygon({
-                            points: JSON.parse(data.regions[index].region), 
-                            fillColor: data.regions[index].color,
-                            strokeWidth: 0
-                        });
-                        var region_marker = map.addMarker({
-                            title: data.regions[index].name,
-                            position: {
-                                lat: data.regions[index].latitude,
-                                lng: data.regions[index].longitude
-                            },
-                            icon: data.regions[index].mark_icon,
-                            snippet: data.regions[index].description
-                        });
-                    }
-                }
-            }, function(xhr, status) {
-                console.log(xhr);
-            }, "json");
 
             $$('#select_type').on('click', function() {
                 app.dialog.create({
@@ -304,7 +320,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     ],
                     verticalButtons: true,
                     closeByBackdropClick: true
-                  }).open();
+                }).open();
             });
             break;
         }
@@ -370,10 +386,10 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 }
                 var account = await get_profile();
                 app.request.post(API_SERVER + "checkin", {
-                    //method: "CLASSIC"
                     image: area_pic, coor: coor.latLng, account: {
                         nrp: account[0], token: account[1]
-                    }, remark: $$('#remark').val()
+                    }, remark: $$('#remark').val(),
+                    route: page.route.params.route
                 }, 
                 function(data, status, xhr) {
                     app.preloader.hide();
@@ -394,6 +410,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
         case "check_common": {
             var account = await get_profile();
             var region = null;
+            init_vmap();
             window.plugins.zxingPlugin.scan({
                 beep_enabled: true,
                 orientation_locked: false,
@@ -407,7 +424,8 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 app.request.post(API_SERVER + "checkpoint/validate", {
                     text: text, account: {
                         nrp: account[0], token: account[1]
-                    }
+                    },
+                    route: page.route.params.route
                 }, 
                 function(data, status, xhr) {
                     app.dialog.close();
@@ -417,7 +435,6 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                         return;
                     } else if (data.status == "success") {
                         $$('#cur_cp').html(data.name);
-                        region = JSON.parse(data.region);
                     }
                 }, function(xhr, status) {
                     app.dialog.close();
@@ -433,7 +450,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 }
                 app.views.main.router.back();
             });
-
+            
             $$("#submit").on("click", async function(ev) {
                 var confirm = await new Promise(function(res, rej) {
                     app.dialog.confirm("Are you sure, want to send it now?", "Check-In Confirmation", 
@@ -456,7 +473,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     return;
                 }
 
-                var isMatch = plugin.google.maps.geometry.poly.containsLocation(coor.latLng, region);
+                var isMatch = within_areas(coor.latLng, $$('#cur_cp').html());//plugin.google.maps.geometry.poly.containsLocation(coor.latLng, region);
                 if (!isMatch){
                     app.preloader.hide();
                     app.dialog.alert("Your location isn't valid with current checkpoint location.", "Error");
@@ -466,7 +483,8 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 app.request.post(API_SERVER + "checkin", {
                     image: '', coor: coor.latLng, account: {
                         nrp: account[0], token: account[1]
-                    }, remark: $$('#remark').val()
+                    }, remark: $$('#remark').val(),
+                    route: page.route.params.route
                 }, 
                 function(data, status, xhr) {
                     app.preloader.hide();
@@ -493,6 +511,8 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 if (proc) app.preloader.show();
                 else app.preloader.hide();
             });
+
+            await init_vmap();
             viewer = $('#viewer').DataTable({
                 serverSide: true,
                 ajax: {
@@ -515,9 +535,9 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 ], 
                 createdRow: function(row, data, index) {
                     data = data.DT_RowData;
-                    var isMatch = plugin.google.maps.geometry.poly.containsLocation(data.coor, JSON.parse(data.region));
-                    if (isMatch)
-                        $$(row).addClass('active');
+                    var is_there = within_areas(data.coor, data.checkpoint_name);
+                    if (is_there) $$(row).addClass('active');
+                    else if (is_there == null) $$(row).addClass('error');
                 },
                 orderMulti: false, order: [[2, 'desc']],
                 language: {
@@ -545,7 +565,6 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
 
             $(document).off('click', '#viewer tbody tr');
             $(document).on('click', '#viewer tbody tr', function() {
-                //console.log($$(this));
                 if ($$(this).children('td').hasClass('dataTables_empty')) return;
                 app.views.main.router.navigate({
                     name: 'history_detail',
@@ -808,36 +827,203 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             break;
         }
         case "checkpoints": {
-            app.preloader.show();
-            app.request.post(API_SERVER + "checkpoint", null, 
-            function(data, status, xhr) {
-                app.preloader.hide();
-                if (data.status == "error") {
-                    app.dialog.alert(data.desc, "Error"); return;
-                } else if (data.status == "success") {
-                    var amount = data.amount;
-                    for (var index in data.checkpoints) {
-                        var cp = data.checkpoints[index];
-                        var html = 
-'<li data-id="'+ cp.id +'" data-lat="'+ cp.latitude +'" data-lng="'+ cp.longitude +'">' +
-    '<a href="#" class="item-content item-link">' +
-        '<div class="item-inner">' +
-            '<div class="item-title">'+ cp.name +'</div>' +
-        '</div>' +
-        '<div class="item-side">' +
-            '<i class="f7-icons '+ (cp.active == 1 ? 'active' : '') +'">circle_fill</i>' +
-        '</div>' +
-        '<div class="sortable-handler"></div>' +
-    '</a>' +
-'</li>';
-                        $$('#cp-list > ul').append(html);
+            function get_cp() {
+                app.preloader.show();
+                $$('#cp-list *').remove();
+                app.request.post(API_SERVER + "checkpoint", null, 
+                function(data, status, xhr) {
+                    app.preloader.hide();
+                    if (data.status == "error") {
+                        app.dialog.alert(data.desc, "Error"); return;
+                    } else if (data.status == "success") {
+                        for (var gIndex in data.checkpoints) {
+                            $$('#cp-list').append(
+                                '<div class="list-group" data-route="'+ gIndex +'"><ul>' +
+                                    '<li class="list-group-title no-sorting">Area '+ gIndex +'</li>'
+                            );
+                            for (var cpIndex in data.checkpoints[gIndex]) {
+                                var cp = data.checkpoints[gIndex][cpIndex];
+                                var html = 
+                                //'<li data-id="'+ cp.id +'" data-name="'+ cp.name +'" data-route="'+ gIndex +'" data-state="'+ (cp.active == 1 ? "on" : "off") +'" class="item-content item-link">' +
+                                '<li class="item-content item-link">' +
+                                    '<div class="item-inner">' +
+                                        '<div class="item-title">'+ cp.name +'</div>' +
+                                    '</div>' +
+                                    '<div class="item-side">' +
+                                        '<i class="f7-icons '+ (cp.active == 1 ? 'active' : '') +'">circle_fill</i>' +
+                                    '</div>' +
+                                    '<div class="sortable-handler"></div>' +
+                                '</li>';
+                                $('#cp-list > .list-group:last-child > ul').append($(html).data({
+                                    id: cp.id, name: cp.name, route: gIndex, state: [cp.active == 1 ? "on" : "off"]
+                                }));
+                            }
+                            $$('#cp-list').append(
+                                '</ul></div>'
+                            );
+                        }
+                        
                     }
-                }
-            }, function(xhr, status) {
-                app.preloader.hide();
-                app.dialog.alert("Error while fetching data to the server.", "Unexpected Server Error");
-                console.log(xhr);
-            }, "json");
+                }, function(xhr, status) {
+                    app.preloader.hide();
+                    app.dialog.alert("Error while fetching data to the server.", "Unexpected Server Error");
+                    console.log(xhr);
+                }, "json");
+            }
+            get_cp();
+
+
+            var ed = app.dialog.create({
+                content: $$('#editor-dialog').html(),
+                buttons: [
+                    {text: "Save", close: false, onClick: async function() {
+                        app.input.validateInputs('#editor');
+                        if ($$('#editor input.input-invalid').length > 0) return;
+
+                        app.preloader.show();
+                        var account = await get_profile(), xtra = null;
+                        if (ed.params.title.toLowerCase() == "edit checkpoint")
+                            xtra = $('#editor').data('prev_data');
+                        app.request.post(API_SERVER + "checkpoint/" + (xtra == null ? "new" : "edit"), {
+                            account: {
+                                nrp: account[0], token: account[1]
+                            },
+                            input: app.form.convertToData('#editor'),
+                            previous_data: xtra
+                        }, 
+                        function(data, status, xhr) {
+                            app.preloader.hide();
+                            ed.close();
+                            if (data.status == "error") {
+                                app.dialog.alert(data.desc, "Error");
+                            } else if (data.status == "success") {
+                                app.dialog.alert("Checkpoint have been successfully updated!", "Checkpoint Updated");
+                                get_cp();
+                            }
+                        }, function(xhr, status) {
+                            app.preloader.hide();
+                            ed.close();
+                            app.dialog.alert('An error occured while sending data to the server', 'Error');
+                            console.log(xhr);
+                        }, "json");
+                    }},
+                    {text: "Cancel"}
+                ],
+                closeByBackdropClick: false,
+                cssClass: 'dialog-nopad'
+            });
+            $$('#editor').remove();
+
+            $$('#new-cp').on('click', function() {
+                ed.setTitle('New Checkpoint');
+                ed.open();
+                app.form.fillFromData('#editor', {name: ''/*, desc: ''*/, route: '', state: "off"});
+            });
+            $$('#edit-cp').on('click', function() {
+                app.popover.close();
+                var data = $('#ctx-cp').data();
+                ed.setTitle('Edit Checkpoint');
+                ed.open();
+                app.form.fillFromData('#editor', {name: data.name/*, desc: data.desc*/, route: data.route, state: data.state});
+                $('#editor').data('prev_data', data.id);
+            });
+            $$('#remove-cp').on('click', async function() {
+                app.popover.close();
+                var confirm = await new Promise(function(res, rej) {
+                    app.dialog.confirm("Are you sure you want to remove it permanently?", "Remove Confirmation", 
+                    function() { res(true); }, function() { res(false); });
+                });
+                if (!confirm) return;
+                app.preloader.show();
+                var account = await get_profile();
+                var cp_data = $('#ctx-cp').data();
+                app.request.post(API_SERVER + "checkpoint/remove", {
+                    account: {
+                        nrp: account[0], token: account[1]
+                    },
+                    id: cp_data.id
+                }, 
+                function(data, status, xhr) {
+                    app.preloader.hide();
+                    if (data.status == "error") {
+                        app.dialog.alert(data.desc, "Error");
+                    } else if (data.status == "success") {
+                        app.dialog.alert("Checkpoint "+ cp_data.name +" have been removed!", "Removal Success");
+                        get_cp();
+                    }
+                }, function(xhr, status) {
+                    app.preloader.hide();
+                    app.dialog.alert('An error occured while sending data to the server', 'Error');
+                    console.log(xhr);
+                }, "json");
+            });
+            $(document).off('click', '#cp-list ul .item-content');
+            $(document).on('click', '#cp-list ul .item-content', function() {
+                app.popover.open("#ctx-cp", $$(this), true);
+                $('#ctx-cp').data($(this).data());
+            });
+            //====================
+
+            $$('#map_editor-cp').click(() => {
+                window.open(EDITOR_MAP, '_system');
+            });
+            $$('#order-cp').click(() => {
+                app.sortable.enable('#cp-list');
+            });
+            $$('#order-save-cp').click(async () => {
+                var confirm = await new Promise(function(res, rej) {
+                    app.dialog.confirm("Are you sure, want to change the sequence of checkpoints with those order?", "Re-order Confirmation", 
+                    function() { res(true); }, function() { res(false); });
+                });
+                if (!confirm) return;
+                var orders = [];
+                var i = 0;
+                var account = await get_profile();
+                $$('#cp-list .list-group').forEach((elGroup) => {
+                    i++; var seq = 1;
+                    $$('#cp-list .list-group:nth-child('+ i +') li.item-content').forEach((el) => {
+                        orders.push({
+                            id: $(el).data('id'), //route: $$(elGroup).data('route') || '', 
+                            seq: seq
+                        });
+                        seq++;
+                    });
+                });
+                app.request.post(API_SERVER + "checkpoint/reorder", {
+                    account: {
+                        nrp: account[0], token: account[1]
+                    },
+                    checkpoints: orders
+                }, 
+                function(data, status, xhr) {
+                    app.preloader.hide();
+                    if (data.status == "error") {
+                        app.dialog.alert(data.desc, "Error");
+                    } else if (data.status == "success") {
+                        //app.dialog.alert("", "Reorder Success");
+                        app.sortable.disable('#cp-list');
+                        get_cp();
+                    }
+                }, function(xhr, status) {
+                    app.preloader.hide();
+                    app.dialog.alert('An error occured while sending data to the server', 'Error');
+                    console.log(xhr);
+                }, "json");
+            });
+            $$('#order-cancel-cp').click(() => {
+                app.sortable.disable('#cp-list');
+                get_cp();
+            });
+            $$(document).on('sortable:enable', '#cp-list', () => {
+                $$('#cp-list .item-content .item-side').addClass("none");
+                $$('#mnu-primary').addClass('none');
+                $$('#mnu-order').removeClass('none');
+            });
+            $$(document).on('sortable:disable', '#cp-list', () => {
+                $$('#cp-list .item-content .item-side').removeClass("none");
+                $$('#mnu-order').addClass('none');
+                $$('#mnu-primary').removeClass('none');
+            });
             break;
         }
 
@@ -845,10 +1031,40 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
     }
 });
 
-async function init_today_cp() {
+var areas = [];
+async function init_vmap() {
+    var vmap = plugin.google.maps.Map.getMap();
+    await new Promise((res, rej) => {
+        vmap.addKmlOverlay({
+            url: KML_MAP
+        }, function(kml) {
+            if (kml == null) res();
+            kml.kmlData.getAt(0).getAt(0).forEach(function(el) {
+                areas.push({
+                    name: el.get('name').value,
+                    points: el.get('points')
+                });
+            }).then(() => {
+                res();
+            });
+        });
+    });
+}
+function within_areas(coor, areaName) {
+    try {
+        if (plugin.google.maps.geometry.poly.containsLocation(coor, areas.find((el) => {
+            return el.name.toLowerCase() == areaName.toLowerCase();
+        }).points)) return true;
+        else return false;
+    } catch(exc) {
+        return null;
+    }
+}
+
+async function check_cp() {
     if ($$(app.views.main.router.currentPageEl).data('name') != "check-in") return;
     var account = await get_profile();
-    app.request.post(API_SERVER + "history/today_checkin", {
+    app.request.post(API_SERVER + "history/user", {
         account: {
             nrp: account[0], token: account[1]
         }
@@ -857,11 +1073,11 @@ async function init_today_cp() {
         if (data.status == "error") {
             app.dialog.alert(data.desc, "Error"); return;
         } else if (data.status == "success") {
-            $$('#cp-list > ul > li').each(function(index,el) {
+            $$('#cp-list ul > li').each(function(index,el) {
                 if (data.passed_cp.find(arr => arr.cp_id == $$(el).data('id')) == null)
-                    $$('#cp-list > ul > li[data-id="'+ $$(el).data('id') +'"] .item-side i').removeClass('active');
+                    $$('#cp-list ul > li[data-id="'+ $$(el).data('id') +'"] .item-side i').removeClass('active');
                 else
-                    $$('#cp-list > ul > li[data-id="'+ $$(el).data('id') +'"] .item-side i').addClass('active');
+                    $$('#cp-list ul > li[data-id="'+ $$(el).data('id') +'"] .item-side i').addClass('active');
             });
         }
     }, function(xhr, status) {
@@ -870,7 +1086,7 @@ async function init_today_cp() {
 }
 
 $$(document).on("page:reinit", ".page[data-name=\"check-in\"]", async function(ev, page) {
-    init_today_cp();
+    check_cp();
 });
 
 $$(document).on("click", "#back", function() {

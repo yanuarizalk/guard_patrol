@@ -11,14 +11,14 @@ var routes = [
     {path: "/check-in", url: "./pages/check-in.html", options: {
         transition: 'f7-push'
     }},
-    {path: "/check_classic", url: "./pages/check_classic.html", options: {
+    {path: "/check_classic/:route/", url: "./pages/check_classic.html", options: {
         transition: 'f7-push'
-    }},
-    {path: "/check_common", url: "./pages/check_common.html", options: {
+    }, name: "check_classic"},
+    {path: "/check_common/:route/", url: "./pages/check_common.html", options: {
         transition: 'f7-push'
-    }},
+    }, name: "check_common"},
     {path: "/map", url: "./pages/map.html", options: {
-        transition: 'f7-parallax'
+        transition: 'f7-cover-v'
     }},
     {path: "/history", url: "./pages/history.html", options: {
         transition: 'f7-parallax'
