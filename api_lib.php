@@ -48,63 +48,75 @@
     }
 
 //return id of checkpoints from table; return 0 if user has finished the route
-    function current_checkpoint($nrp, $returnAll = false) {
+    function current_checkpoint($nrp, $route, $returnAll = false) {
         global $db;
-        $minDay = strtotime("today");
-        $maxDay = strtotime("today") + 86400;
         $temp['query'] = $db['conn'] -> prepare(
             "SELECT 
-                id, cp_id, dt 
+                history.id, history.cp_id, history.dt
             FROM history 
-            WHERE user_nrp = :nrp AND is_finished = 0
-            ORDER BY cp_id"
+            INNER JOIN checkpoint ON history.cp_id = checkpoint.id
+            WHERE history.user_nrp = :nrp AND history.is_finished = 0 
+                AND checkpoint.route = :route AND checkpoint.active = 1
+            ORDER BY checkpoint.sequence"
         );
         if (!$temp['query']->execute([
-            ':nrp' => $nrp
+            ':nrp' => $nrp,
+            ':route' => $route
         ])) return false;
         
         $passed = $temp['query'] -> rowCount();
-        $temp['query'] = $db['conn'] -> prepare("SELECT COUNT(*) AS amount FROM checkpoint WHERE active = 1");
-        if (!$temp['query']->execute()) return false;
+        $temp['query'] = $db['conn'] -> prepare(
+            "SELECT 
+                COUNT(*) AS amount 
+            FROM checkpoint 
+            WHERE active = 1 AND route = :route"
+        );
+        if (!$temp['query']->execute([
+            ':route' => $route
+        ])) return false;
         $is_finished = ($temp['query'] -> fetch(PDO::FETCH_ASSOC)['amount'] < $passed + 1);
         if ($is_finished) return 0;
         if (!$returnAll) {
-            if ($passed < 1) return ordered_checkpoint()['id'];
-            return ordered_checkpoint($passed + 1)['id'];
+            if ($passed < 1) return ordered_checkpoint($route)['id'];
+            return ordered_checkpoint($route, $passed + 1)['id'];
         } else {
-            if ($passed < 1) return ordered_checkpoint();
-            return ordered_checkpoint($passed + 1);
+            if ($passed < 1) return ordered_checkpoint($route);
+            return ordered_checkpoint($route, $passed + 1);
         }
     }
 
     //experimental method
-    function getSeq_checkpoint($nrp) {
+    function getSeq_checkpoint($nrp, $route) {
         global $db;
         $cur_cp = current_checkpoint($nrp);
         $temp['query'] = $db['conn'] -> prepare(
             "SELECT @curRow := @curRow + 1 AS seq 
                 FROM checkpoint, (SELECT @curRow := 0) cRow 
                 WHERE checkpoint.active = 1 AND checkpoint.id = :cur_cp
-                ORDER BY checkpoint.id 
+                    AND checkpoint.route = :route
+                ORDER BY checkpoint.sequence 
                 LIMIT 1"
             );
         if (!$temp['query']->execute([
-            ':cur_cp' => $cur_cp
+            ':cur_cp' => $cur_cp,
+            ':route' => $route
         ])) return false;
         $temp['res'] = $temp['query']->fetch(PDO::FETCH_ASSOC)['seq'];
         return $temp['res'];
     }
 
-    function ordered_checkpoint($seq = 1) {
+    function ordered_checkpoint($route, $seq = 1) {
         global $db;
         $temp['query'] = $db['conn'] -> prepare(
             "SELECT * FROM (
                 SELECT checkpoint.*, @curRow := @curRow + 1 AS seq 
                 FROM checkpoint, (SELECT @curRow := 0) cRow 
-                WHERE checkpoint.active = 1 ORDER BY checkpoint.id
+                WHERE checkpoint.active = 1 AND checkpoint.route = :route
+                ORDER BY checkpoint.sequence
             ) a WHERE seq = :seq");
         if (!$temp['query']->execute([
-            ':seq' => $seq
+            ':seq' => $seq,
+            ':route' => $route
         ])) return null;        
         $temp['res'] = $temp['query']->fetch(PDO::FETCH_ASSOC);
         return $temp['res'];
@@ -131,6 +143,8 @@
     }
     function errReqData($res) {
         global $db;
-
+        
+        $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
+        return $res;
     }
 ?>

@@ -23,10 +23,7 @@
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
             /*->withStatus(200)*/;
             //->withHeader('Access-Control-Allow-Method', '');
-        if ($data === null || !is_numeric($data["nrp"])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
-            return $res;
-        }
+        if ($data === null || !is_numeric($data["nrp"])) return errReqData($res);
         $db['query'] = $db['conn'] -> prepare("SELECT level, is_used FROM users WHERE nrp = :nrp");
         if (!$db['query']->execute([
             ':nrp' => $data["nrp"]
@@ -59,10 +56,7 @@
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
             /*->withStatus(200)*/;
             //->withHeader('Access-Control-Allow-Method', '');
-        if ($data === null || !isset($data["nrp"], $data["token"])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
-            return $res;
-        }
+        if ($data === null || !isset($data["nrp"], $data["token"])) return errReqData($res);
         $db['query'] = $db['conn'] -> prepare("SELECT is_used, token FROM users WHERE nrp = :nrp");
         if (!$db['query']->execute([
             ':nrp' => $data["nrp"]
@@ -94,11 +88,12 @@
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
         $db['query'] = $db['conn'] -> prepare(
             "SELECT 
-                id, name, latitude, longitude, active
-            FROM checkpoint 
-            /*WHERE active = 1*/");
+                route, id, name, active
+            FROM checkpoint
+            /*WHERE active = 1*/
+            ORDER BY route ASC, sequence ASC");
         if (!$db['query']->execute()) return errQuery($res);
-        $db['res'] = $db['query']->fetchAll(PDO::FETCH_ASSOC);
+        $db['res'] = $db['query']->fetchAll(PDO::FETCH_GROUP);
         $res->getBody()->write(json_encode([
             "status" => "success", "checkpoints" => $db['res'],
             "amount" => $db['query'] -> rowCount()
@@ -119,7 +114,7 @@
             
         $db['query'] = $db['conn'] -> prepare(
             "SELECT 
-                name, latitude, longitude
+                name
             FROM checkpoint 
             WHERE id = :id AND active = 1"
         );
@@ -132,7 +127,7 @@
         }
         $db['res'] = $db['query'] -> fetch(PDO::FETCH_ASSOC);
         
-        $qr->setText(hash('sha512',$db['res']['latitude'].','.$db['res']['longitude']));
+        $qr->setText(hash('sha512',"[".$db['res']['name']."]"/*.','.$db['res']['longitude']*/));
         $qr->setSize(320);
         $qr->setMargin(16);
         $qr->setEncoding('UTF-8');
@@ -153,22 +148,130 @@
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
 
-        if (!isset($data['text'], $data['account']['nrp'], $data['account']['token'])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
-            return $res;
-        }
+        if (!isset($data['text'], $data['route'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
         if (!check_profile($data['account']['nrp'], $data['account']['token']))  {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
             return $res;
         }
             
-        $cur_cp = current_checkpoint($data['account']['nrp'], true);
-        if (hash("sha512", $cur_cp['latitude'].",".$cur_cp['longitude']) != $data['text']) {
+        $cur_cp = current_checkpoint($data['account']['nrp'], $data['route'], true);
+        if (hash("sha512", "[".$cur_cp['name']."]") != $data['text']) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Location isn't valid."]));
             return $res;
         }
         $res->getBody()->write(json_encode([
-            "status" => "success", "name" => $cur_cp['name'], "region" => $cur_cp['region']
+            "status" => "success", "name" => $cur_cp['name']//, "region" => $cur_cp['region']
+        ]));
+        return $res;
+    });
+    $app->post('/checkpoint/reorder', function($req, $res, $args) {
+        global $db;
+
+        $data = $req -> getParsedBody();
+        $res = $res->withHeader('Content-Type', 'application/json')
+            ->withHeader('Access-Control-Allow-Origin', '*')
+            ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
+
+        if (!isset($data['checkpoints'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2))  {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
+            return $res;
+        }
+        if (!is_array($data['checkpoints'])) return errReqData($res);
+        $db['query'] = $db['conn'] -> prepare(
+            'UPDATE checkpoint SET sequence = :seq WHERE id = :id'
+        );
+        foreach ($data['checkpoints'] as $index => $val) {
+            if (!$db['query']->execute([
+                ':id' => $val['id'],
+                ':seq' => $val['seq']
+            ])) return errQuery($res);
+        }
+        $res->getBody()->write(json_encode([
+            "status" => "success"
+        ]));
+        return $res;
+    });
+
+    $app->post('/checkpoint/new', function($req, $res, $args) {
+        global $db;
+        $data = $req->getParsedBody();
+        $res = $res->withHeader('Content-Type', 'application/json')
+            ->withHeader('Access-Control-Allow-Origin', '*')
+            ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
+        if (!isset($data['input']['name'], $data['input']['route'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
+            return $res;
+        }
+        $db['query'] = $db['conn'] -> prepare(
+            "INSERT INTO checkpoint 
+            VALUES(null, :route, :name, :state, (
+                SELECT COALESCE(MAX(sequence), 0) + 1 FROM checkpoint AS cp WHERE route = :route
+            ))"
+        );
+        if (!$db['query']->execute([
+            ':route' => $data['input']['route'],
+            ':name' => $data['input']['name'],
+            ':state' => isset($data['input']['state'][0]) ? 1 : 0
+        ])) return errQuery($res);
+        $res->getBody()->write(json_encode([
+            "status" => "success"
+        ]));
+        return $res;
+    });
+
+    $app->post('/checkpoint/edit', function($req, $res, $args) {
+        global $db;
+        $data = $req->getParsedBody();
+        $res = $res->withHeader('Content-Type', 'application/json')
+            ->withHeader('Access-Control-Allow-Origin', '*')
+            ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
+        if (!isset($data['input']['route'], $data['input']['name'], $data['previous_data'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
+            return $res;
+        }
+        $db['query'] = $db['conn'] -> prepare(
+            "UPDATE checkpoint SET route = :route, name = :name, active = :state WHERE id = :prev_id"
+        );
+        if (!$db['query']->execute([
+            ':route' => $data['input']['route'],
+            ':name' => $data['input']['name'],
+            ':state' => isset($data['input']['state'][0]) ? 1 : 0,
+            ':prev_id' => $data['previous_data']
+        ])) return errQuery($res);
+        $res->getBody()->write(json_encode([
+            "status" => "success"
+        ]));
+        return $res;
+    });
+
+    $app->post('/checkpoint/remove', function($req, $res, $args) {
+        global $db;
+        $data = $req->getParsedBody();
+        $res = $res->withHeader('Content-Type', 'application/json')
+            ->withHeader('Access-Control-Allow-Origin', '*')
+            ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
+        if (!isset($data['id'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
+            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
+            return $res;
+        }
+        $db['query'] = $db['conn'] -> prepare(
+            "DELETE FROM checkpoint WHERE id = :id"
+        );
+        if (!$db['query']->execute([
+            ':id' => $data['id']
+        ])) return errQuery($res);
+        $db['query'] = $db['conn'] -> prepare(
+            "DELETE FROM history WHERE cp_id = :id"
+        );
+        if (!$db['query']->execute([
+            ':id' => $data['id']
+        ])) return errQuery($res);
+        $res->getBody()->write(json_encode([
+            "status" => "success"
         ]));
         return $res;
     });
@@ -214,15 +317,12 @@
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
 
         
-        if (!isset($data['image'], $data['coor'], $data['account']['nrp'], $data['account']['token'])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
-            return $res;
-        }
+        if (!isset($data['image'], $data['coor'], $data['route'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
         if (!check_profile($data['account']['nrp'], $data['account']['token'])) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
             return $res;
         }
-        $cur_cp = current_checkpoint($data['account']['nrp'], true);
+        $cur_cp = current_checkpoint($data['account']['nrp'], $data['route'], true);
         if ($cur_cp === 0) {
             $res->getBody()->write(json_encode(["status" => "success", "desc" => "You have finished the route! only 1 lap/day are allowed"]));
             return $res;
@@ -248,13 +348,17 @@
                 return $res->getBody()->write(json_encode(["status" => "error", "desc" => "Can't save the captured image"]));
         }
 
-        $cur_cp = current_checkpoint($data['account']['nrp'], true);
+        $cur_cp = current_checkpoint($data['account']['nrp'], $data['route'], true);
         if ($cur_cp === 0) {
             $db['query'] = $db['conn'] -> prepare(
-                "UPDATE history SET is_finished = 1 WHERE user_nrp = :nrp"
+                "UPDATE history 
+                INNER JOIN checkpoint ON history.cp_id = checkpoint.id
+                SET is_finished = 1 
+                WHERE user_nrp = :nrp AND route = :route AND is_finished = 0"
             );
             if (!$db['query']->execute([
-                ':nrp' => $data['account']['nrp']
+                ':nrp' => $data['account']['nrp'],
+                ':route' => $data['route']
             ])) return errQuery($res);
             $res->getBody()->write(json_encode(["status" => "success", "desc" => "Congrats! You have finished the route!"]));
         }
@@ -278,10 +382,7 @@
         if (!isset(
             $data['account']['nrp'], $data['account']['token'],
             $data['draw'], $data['order'][0], $data['search']['value']
-        )) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
-            return $res;
-        }
+        )) return errReqData($res);
         if (!check_profile($data['account']['nrp'], $data['account']['token'], 1)) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
             return $res;
@@ -316,7 +417,7 @@
             "SELECT 
                 history.id, checkpoint.name AS checkpoint_name, users.name AS user_name,
                 history.dt, history.cp_id AS checkpoint_id, history.user_nrp AS user_nrp,
-                checkpoint.region AS region, history.latitude, history.longitude, method
+                /*checkpoint.region AS region,*/ history.latitude, history.longitude, method
             FROM history 
             INNER JOIN checkpoint ON history.cp_id = checkpoint.id 
             INNER JOIN users ON history.user_nrp = users.nrp 
@@ -338,11 +439,12 @@
                     'history_id' => $val['id'],
                     'checkpoint_id' => $val['checkpoint_id'],
                     'user_nrp' => $val['user_nrp'],
-                    'region' => $val['region'],
+                    //'region' => $val['region'],
                     'coor' => [
                         'lat' => $val['latitude'],
                         'lng' => $val['longitude']
-                    ]
+                    ],
+                    'checkpoint_name' => $val['checkpoint_name']
                 ],
                 'user_name' => $val['user_name'],
                 'checkpoint_name' => $val['checkpoint_name'],
@@ -359,37 +461,28 @@
         return $res;
     });
 
-    $app->post('/history/today_checkin', function($req, $res, $args) {
+    $app->post('/history/user', function($req, $res, $args) {
         global $db;
-
-        $minDt = strtotime('today');
-        $maxDt = $minDt + 86400;
 
         $data = $req->getParsedBody();
         $res = $res->withHeader('Content-Type', 'application/json')
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
 
-        if (!isset($data['account']['nrp'], $data['account']['token'])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
-            return $res;
-        }
+        if (!isset($data['account']['nrp'], $data['account']['token'])) return errReqData($res);
         if (!check_profile($data['account']['nrp'], $data['account']['token'])) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
             return $res;
         }
-        $cur_cp = current_checkpoint($data['account']['nrp'], false);
         $db['query'] = $db['conn'] -> prepare(
             "SELECT 
                 cp_id
             FROM history 
             INNER JOIN checkpoint ON cp_id = checkpoint.id
-            WHERE cp_id < :current_cp AND 
-                checkpoint.active = 1 AND user_nrp = :nrp AND
+            WHERE checkpoint.active = 1 AND user_nrp = :nrp AND
                 is_finished = 0"
         );
         if (!$db['query']->execute([
-            ':current_cp' => $cur_cp,
             ':nrp' => $data['account']['nrp']
         ])) return errQuery($res);
         $db['res'] = $db['query'] -> fetchAll(PDO::FETCH_ASSOC);
@@ -410,26 +503,30 @@
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
 
-        if (!isset($data['time'], $data['account']['nrp'], $data['account']['token'])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
-            return $res;
-        }
+        if (!isset($data['time'], $data['route'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
         if (!check_profile($data['account']['nrp'], $data['account']['token'])) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
             return $res;
         }
         
         $query = strtolower($data['time']) == "last" ? 
-            "DELETE
-            FROM history
-            WHERE is_finished = 0 AND user_nrp = :nrp
-            ORDER BY id DESC LIMIT 1" : 
-            "DELETE
+            "DELETE history
+            FROM history, (
+                SELECT history.id
+                FROM history 
+                INNER JOIN checkpoint ON history.cp_id = checkpoint.id
+                WHERE checkpoint.active = 1 AND history.user_nrp = :nrp AND checkpoint.route = :route AND history.is_finished = 0
+                ORDER BY checkpoint.sequence DESC LIMIT 1
+            ) AS refCP
+            WHERE history.id = refCP.id" : 
+            "DELETE history
             FROM history 
-            WHERE is_finished = 0 AND user_nrp = :nrp";
+            INNER JOIN checkpoint ON history.cp_id = checkpoint.id
+            WHERE is_finished = 0 AND user_nrp = :nrp AND checkpoint.route = :route";
         $db['query'] = $db['conn'] -> prepare($query);
         if (!$db['query']->execute([
-            ':nrp' => $data['account']['nrp']
+            ':nrp' => $data['account']['nrp'],
+            ':route' => $data['route']
         ])) return errQuery($res);
         $res->getBody()->write(json_encode([
             "status" => "success"
@@ -445,10 +542,7 @@
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
 
-        if (!isset($data['id'], $data['account']['nrp'], $data['account']['token'])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
-            return $res;
-        }
+        if (!isset($data['id'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
         if (!check_profile($data['account']['nrp'], $data['account']['token'],1)) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
             return $res;
@@ -484,10 +578,7 @@
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
 
-        if (!isset($data['account']['nrp'], $data['account']['token'])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
-            return $res;
-        }
+        if (!isset($data['account']['nrp'], $data['account']['token'])) return errReqData($res);
         if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
             return $res;
@@ -518,10 +609,7 @@
         if (!isset(
             $data['account']['nrp'], $data['account']['token'],
             $data['draw'], $data['order'][0], $data['search']['value']
-        )) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
-            return $res;
-        }
+        )) return errReqData($res);
         if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
             return $res;
@@ -590,10 +678,7 @@
         $res = $res->withHeader('Content-Type', 'application/json')
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
-        if (!isset($data['input']['nrp'], $data['input']['name'], $data['input']['level'], $data['account']['nrp'], $data['account']['token'])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
-            return $res;
-        }
+        if (!isset($data['input']['nrp'], $data['input']['name'], $data['input']['level'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
         if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
             return $res;
@@ -618,10 +703,7 @@
         $res = $res->withHeader('Content-Type', 'application/json')
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
-        if (!isset($data['input']['nrp'], $data['input']['name'], $data['input']['level'], $data['previous_data'], $data['account']['nrp'], $data['account']['token'])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
-            return $res;
-        }
+        if (!isset($data['input']['nrp'], $data['input']['name'], $data['input']['level'], $data['previous_data'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
         if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
             return $res;
@@ -656,10 +738,7 @@
         $res = $res->withHeader('Content-Type', 'application/json')
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
-        if (!isset($data['nrp'], $data['account']['nrp'], $data['account']['token'])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
-            return $res;
-        }
+        if (!isset($data['nrp'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
         if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
             return $res;
@@ -688,10 +767,7 @@
         $res = $res->withHeader('Content-Type', 'application/json')
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
-        if (!isset($data['nrp'], $data['account']['nrp'], $data['account']['token'])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
-            return $res;
-        }
+        if (!isset($data['nrp'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
         if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
             return $res;
