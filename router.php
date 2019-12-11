@@ -27,7 +27,7 @@
         $db['query'] = $db['conn'] -> prepare("SELECT level, is_used FROM users WHERE nrp = :nrp");
         if (!$db['query']->execute([
             ':nrp' => $data["nrp"]
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         if ($db['query'] -> rowCount() < 1) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Invalid ID!"]));
             return $res;
@@ -43,7 +43,7 @@
             ':now' => strtotime("now"),
             ':token' => $token,
             ':nrp' => $data['nrp']
-        ]) ) return errQuery($res);
+        ]) ) return errQuery($res, $db['query']);
         $res->getBody()->write(json_encode(["status" => "success", "token" => $token, "level" => $db['res']['level']]));
         return $res;
     });
@@ -60,7 +60,7 @@
         $db['query'] = $db['conn'] -> prepare("SELECT is_used, token FROM users WHERE nrp = :nrp");
         if (!$db['query']->execute([
             ':nrp' => $data["nrp"]
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         if ($db['query'] -> rowCount() < 1) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "Invalid ID!"]));
             return $res;
@@ -92,7 +92,7 @@
             FROM checkpoint
             /*WHERE active = 1*/
             ORDER BY route ASC, sequence ASC");
-        if (!$db['query']->execute()) return errQuery($res);
+        if (!$db['query']->execute()) return errQuery($res, $db['query']);
         $db['res'] = $db['query']->fetchAll(PDO::FETCH_GROUP);
         $res->getBody()->write(json_encode([
             "status" => "success", "checkpoints" => $db['res'],
@@ -120,7 +120,7 @@
         );
         if (!$db['query']->execute([
             ':id' => $query['id']
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         if ($db['query'] -> rowCount() < 1) {
             $res->getBody()->write(json_encode(["status" => "error", "desc" => "ID not found!"]));
             return $res;
@@ -149,10 +149,7 @@
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
 
         if (!isset($data['text'], $data['route'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token']))  {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token']))  return errUnauthorized($res);
             
         $cur_cp = current_checkpoint($data['account']['nrp'], $data['route'], true);
         if (hash("sha512", "[".$cur_cp['name']."]") != $data['text']) {
@@ -173,10 +170,7 @@
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
 
         if (!isset($data['checkpoints'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2))  {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2))  return errUnauthorized($res);
         if (!is_array($data['checkpoints'])) return errReqData($res);
         $db['query'] = $db['conn'] -> prepare(
             'UPDATE checkpoint SET sequence = :seq WHERE id = :id'
@@ -185,7 +179,7 @@
             if (!$db['query']->execute([
                 ':id' => $val['id'],
                 ':seq' => $val['seq']
-            ])) return errQuery($res);
+            ])) return errQuery($res, $db['query']);
         }
         $res->getBody()->write(json_encode([
             "status" => "success"
@@ -200,10 +194,7 @@
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
         if (!isset($data['input']['name'], $data['input']['route'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) return errUnauthorized($res);
         $db['query'] = $db['conn'] -> prepare(
             "INSERT INTO checkpoint 
             VALUES(null, :route, :name, :state, (
@@ -214,7 +205,7 @@
             ':route' => $data['input']['route'],
             ':name' => $data['input']['name'],
             ':state' => isset($data['input']['state'][0]) ? 1 : 0
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         $res->getBody()->write(json_encode([
             "status" => "success"
         ]));
@@ -228,19 +219,48 @@
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
         if (!isset($data['input']['route'], $data['input']['name'], $data['previous_data'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) return errUnauthorized($res);
         $db['query'] = $db['conn'] -> prepare(
-            "UPDATE checkpoint SET route = :route, name = :name, active = :state WHERE id = :prev_id"
+            "SELECT route, sequence FROM checkpoint WHERE id = :prev_id"
         );
+        if (!$db['query']->execute([
+            ':prev_id' => $data['previous_data']
+        ])) return errQuery($res, $db['query']);
+        $db['res'] = $db['query'] -> fetch(PDO::FETCH_ASSOC);
+        if ($data['input']['route'] == $db['res']['route']) {
+            $db['query'] = $db['conn'] -> prepare(
+                "UPDATE checkpoint SET route = :route, name = :name, active = :state WHERE id = :prev_id"
+            );
+        } else {
+            $db['query'] = $db['conn'] -> prepare(
+                "UPDATE checkpoint 
+                SET route = :route, name = :name, 
+                    active = :state, 
+                    sequence = (
+                        SELECT COALESCE(MAX(cp.sequence), 0) + 1 
+                        FROM (SELECT sequence, route FROM checkpoint AS ref_cp) AS cp 
+                        WHERE cp.route = :route
+                    )
+                WHERE id = :prev_id"
+            );
+        }
         if (!$db['query']->execute([
             ':route' => $data['input']['route'],
             ':name' => $data['input']['name'],
             ':state' => isset($data['input']['state'][0]) ? 1 : 0,
             ':prev_id' => $data['previous_data']
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
+        
+        if ($data['input']['route'] != $db['res']['route']) {
+            $db['query'] = $db['conn'] -> prepare(
+                "UPDATE checkpoint SET sequence = (sequence - 1) WHERE route = :route AND sequence > :seq"
+            );
+            if (!$db['query']->execute([
+                ':route' => $db['res']['route'],
+                ':seq' => $db['res']['sequence']
+            ])) return errQuery($res, $db['query']);
+        }
+        
         $res->getBody()->write(json_encode([
             "status" => "success"
         ]));
@@ -254,22 +274,33 @@
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
         if (!isset($data['id'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) return errUnauthorized($res);
+        $db['query'] = $db['conn'] -> prepare(
+            "SELECT route, sequence FROM checkpoint WHERE id = :prev_id"
+        );
+        if (!$db['query']->execute([
+            ':prev_id' => $data['id']
+        ])) return errQuery($res, $db['query']);
+        $db['res'] = $db['query'] -> fetch(PDO::FETCH_ASSOC);
         $db['query'] = $db['conn'] -> prepare(
             "DELETE FROM checkpoint WHERE id = :id"
         );
         if (!$db['query']->execute([
             ':id' => $data['id']
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         $db['query'] = $db['conn'] -> prepare(
             "DELETE FROM history WHERE cp_id = :id"
         );
         if (!$db['query']->execute([
             ':id' => $data['id']
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
+        $db['query'] = $db['conn'] -> prepare(
+            "UPDATE checkpoint SET sequence = (sequence - 1) WHERE route = :route AND sequence > :seq"
+        );
+        if (!$db['query']->execute([
+            ':route' => $db['res']['route'],
+            ':seq' => $db['res']['sequence']
+        ])) return errQuery($res, $db['query']);
         $res->getBody()->write(json_encode([
             "status" => "success"
         ]));
@@ -283,7 +314,7 @@
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
         $db['query'] = $db['conn'] -> prepare("SELECT id, name, region, color, latitude, longitude, description, mark_icon FROM checkpoint WHERE active = 1");
-        if (!$db['query']->execute()) return errQuery($res);
+        if (!$db['query']->execute()) return errQuery($res, $db['query']);
         $db['res'] = $db['query']->fetchAll(PDO::FETCH_ASSOC);
 
         $res->getBody()->write(json_encode([
@@ -318,10 +349,7 @@
 
         
         if (!isset($data['image'], $data['coor'], $data['route'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'])) return errUnauthorized($res);
         $cur_cp = current_checkpoint($data['account']['nrp'], $data['route'], true);
         if ($cur_cp === 0) {
             $res->getBody()->write(json_encode(["status" => "success", "desc" => "You have finished the route! only 1 lap/day are allowed"]));
@@ -340,7 +368,7 @@
             ':lat' => $data['coor']['lat'],
             ':lng' => $data['coor']['lng'],
             ':method' => $method
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         $lastId = $db['conn'] -> lastInsertId();
 
         if ($method == 0) {
@@ -359,7 +387,7 @@
             if (!$db['query']->execute([
                 ':nrp' => $data['account']['nrp'],
                 ':route' => $data['route']
-            ])) return errQuery($res);
+            ])) return errQuery($res, $db['query']);
             $res->getBody()->write(json_encode(["status" => "success", "desc" => "Congrats! You have finished the route!"]));
         }
         else {
@@ -383,10 +411,7 @@
             $data['account']['nrp'], $data['account']['token'],
             $data['draw'], $data['order'][0], $data['search']['value']
         )) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'], 1)) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 1)) return errUnauthorized($res);
         $draw = $data['draw'];
         $order_by = $data['order'][0]['column'];
         $order_as = $data['order'][0]['dir'];
@@ -411,7 +436,7 @@
         if (!$db['query']->execute([
             ':minDate' => $minDate,
             ':maxDate' => $maxDate
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         $total_unfiltered = $db['query'] -> fetch(PDO::FETCH_ASSOC)['total'];
         $db['query'] = $db['conn'] -> prepare(
             "SELECT 
@@ -430,7 +455,7 @@
             ':minDate' => $minDate,
             ':maxDate' => $maxDate,
             ':search' => '%'.$search.'%'
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         $db['res'] = $db['query']->fetchAll(PDO::FETCH_ASSOC);
         $out = [];
         foreach($db['res'] as $index => $val) {
@@ -470,10 +495,7 @@
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
 
         if (!isset($data['account']['nrp'], $data['account']['token'])) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'])) return errUnauthorized($res);
         $db['query'] = $db['conn'] -> prepare(
             "SELECT 
                 cp_id
@@ -484,7 +506,7 @@
         );
         if (!$db['query']->execute([
             ':nrp' => $data['account']['nrp']
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         $db['res'] = $db['query'] -> fetchAll(PDO::FETCH_ASSOC);
         $res->getBody()->write(json_encode([
             "status" => "success",
@@ -504,10 +526,7 @@
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
 
         if (!isset($data['time'], $data['route'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'])) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'])) return errUnauthorized($res);
         
         $query = strtolower($data['time']) == "last" ? 
             "DELETE history
@@ -527,7 +546,7 @@
         if (!$db['query']->execute([
             ':nrp' => $data['account']['nrp'],
             ':route' => $data['route']
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         $res->getBody()->write(json_encode([
             "status" => "success"
         ]));
@@ -543,10 +562,7 @@
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
 
         if (!isset($data['id'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'],1)) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'],1)) return errUnauthorized($res);
         $db['query'] = $db['conn'] -> prepare(
             "SELECT 
                 checkpoint.name AS checkpoint_name, users.name AS user_name,
@@ -558,7 +574,7 @@
         );
         if (!$db['query']->execute([
             ':history_id' => $data['id']
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         $db['res'] = $db['query'] -> fetch(PDO::FETCH_ASSOC);
         $res->getBody()->write(json_encode([
             "status" => "success", "remark" => htmlspecialchars($db['res']['remark']),
@@ -579,10 +595,7 @@
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
 
         if (!isset($data['account']['nrp'], $data['account']['token'])) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) return errUnauthorized($res);
         
         $method = get_method();
         $db['query'] = $db['conn'] -> prepare(
@@ -590,7 +603,7 @@
         );
         if (!$db['query']->execute([
             ':val' => $method == "CLASSIC" ? "COMMON" : "CLASSIC"
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         $res->getBody()->write(json_encode([
             "status" => "success"
         ]));
@@ -610,10 +623,7 @@
             $data['account']['nrp'], $data['account']['token'],
             $data['draw'], $data['order'][0], $data['search']['value']
         )) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) return errUnauthorized($res);
         $draw = $data['draw'];
         $order_by = $data['order'][0]['column'];
         $order_as = $data['order'][0]['dir'];
@@ -633,7 +643,7 @@
         $db['query'] = $db['conn'] -> prepare(
             "SELECT COUNT(*) AS total FROM users"
         );
-        if (!$db['query']->execute()) return errQuery($res);
+        if (!$db['query']->execute()) return errQuery($res, $db['query']);
         $total_unfiltered = $db['query'] -> fetch(PDO::FETCH_ASSOC)['total'];
         $db['query'] = $db['conn'] -> prepare(
             "SELECT 
@@ -645,7 +655,7 @@
         );
         if (!$db['query']->execute([
             ':search' => '%'.$search.'%'
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         $db['res'] = $db['query']->fetchAll(PDO::FETCH_ASSOC);
         $out = [];
         foreach($db['res'] as $index => $val) {
@@ -679,10 +689,7 @@
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
         if (!isset($data['input']['nrp'], $data['input']['name'], $data['input']['level'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) return errUnauthorized($res);
         $db['query'] = $db['conn'] -> prepare(
             "INSERT INTO users VALUES(:nrp, :name, :level, 0, unix_timestamp(), \"\")"
         );
@@ -690,7 +697,7 @@
             ':nrp' => str_replace('-','', $data['input']['nrp']),
             ':name' => $data['input']['name'],
             ':level' => $data['input']['level']
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         $res->getBody()->write(json_encode([
             "status" => "success"
         ]));
@@ -704,10 +711,7 @@
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
         if (!isset($data['input']['nrp'], $data['input']['name'], $data['input']['level'], $data['previous_data'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) return errUnauthorized($res);
         $db['query'] = $db['conn'] -> prepare(
             "UPDATE users SET nrp = :nrp, name = :name, level = :level WHERE nrp = :prev_nrp"
         );
@@ -716,7 +720,7 @@
             ':name' => $data['input']['name'],
             ':level' => $data['input']['level'],
             ':prev_nrp' => $data['previous_data']
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         if (str_replace('-','', $data['input']['nrp']) != $data['previous_data']) {
             $db['query'] = $db['conn'] -> prepare(
                 "UPDATE history SET user_nrp = :nrp WHERE user_nrp = :prev_nrp"
@@ -724,7 +728,7 @@
             if (!$db['query']->execute([
                 ':nrp' => str_replace('-','', $data['input']['nrp']),
                 ':prev_nrp' => $data['previous_data']
-            ])) return errQuery($res);
+            ])) return errQuery($res, $db['query']);
         }
         $res->getBody()->write(json_encode([
             "status" => "success"
@@ -739,22 +743,19 @@
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
         if (!isset($data['nrp'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) return errUnauthorized($res);
         $db['query'] = $db['conn'] -> prepare(
             "DELETE FROM users WHERE nrp = :nrp"
         );
         if (!$db['query']->execute([
             ':nrp' => $data['nrp']
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         $db['query'] = $db['conn'] -> prepare(
             "DELETE FROM history WHERE user_nrp = :nrp"
         );
         if (!$db['query']->execute([
             ':nrp' => $data['nrp']
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         $res->getBody()->write(json_encode([
             "status" => "success"
         ]));
@@ -768,16 +769,13 @@
             ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
         if (!isset($data['nrp'], $data['account']['nrp'], $data['account']['token'])) return errReqData($res);
-        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) {
-            $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
-            return $res;
-        }
+        if (!check_profile($data['account']['nrp'], $data['account']['token'], 2)) return errUnauthorized($res);
         $db['query'] = $db['conn'] -> prepare(
             "UPDATE users SET is_used = 0 WHERE nrp = :nrp"
         );
         if (!$db['query']->execute([
             ':nrp' => $data['nrp']
-        ])) return errQuery($res);
+        ])) return errQuery($res, $db['query']);
         $res->getBody()->write(json_encode([
             "status" => "success"
         ]));

@@ -127,23 +127,21 @@
     }
 
 
-    function errQuery($res/*, $state*/) {
-        global $db;
+    function errQuery($res, $db/*, $state*/) {
+        //global $db;
         $res->getBody()->write(json_encode([
             "status" => "error", 
             "desc" => "An Error occured while processing data",
-            "error" => $db['conn'] -> errorInfo(),
-            "code" => $db['conn'] -> errorCode()
+            "error" => $db -> errorInfo(),
+            "code" => $db -> errorCode()
         ]));
         return $res;
     }
-    function errUnAuthorized($res) {
-        global $db;
-
+    function errUnauthorized($res) {
+        $res->getBody()->write(json_encode(["status" => "error", "desc" => "Not authorized"]));
+        return $res;
     }
     function errReqData($res) {
-        global $db;
-        
         $res->getBody()->write(json_encode(["status" => "error", "desc" => "Data isn't in correct format"]));
         return $res;
     }
