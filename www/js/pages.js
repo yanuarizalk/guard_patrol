@@ -1,4 +1,5 @@
 var viewer;
+var areas = [];
 
 $$(document).on("page:mounted", ".page", async function(ev, page) {
     switch (page.name) {
@@ -74,7 +75,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                         })
                     });
                     app.dialog.create({
-                        title: 'Select Route',
+                        title: 'Select Area',
                         text: text,
                         buttons: routes,
                         verticalButtons: true,
@@ -98,6 +99,9 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     var amount = data.amount;
                     for (var gIndex in data.checkpoints) {
                         if (gIndex == "") continue;
+                        if (data.checkpoints[gIndex].find((el) => {
+                            return el.active == 1
+                        }) == null) continue;
                         $$('#cp-list').append(
                             '<div class="list-group" data-route="'+ gIndex +'"><ul>' +
                                 '<li class="list-group-title">Area '+ gIndex +'</li>'
@@ -162,7 +166,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     app.dialog.alert("You have finished the route today! Please, take care of your body!", "Error");
                     return;
                 }*/
-                var route = await SelectRoute('Choose which route to take in');
+                var route = await SelectRoute('Choose which area to take in');
                 if (route === false) return;
                 app.views.main.router.navigate({
                     name: $$("#check").data("method").toUpperCase() == "COMMON" ? "check_common" : "check_classic",
@@ -177,7 +181,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 app.views.main.router.navigate('/map/?use_ls=1&lat=' + lat + '&lng=' + lng + "&no_marker=1");
             });*/
             $$("#restart").on("click", async function() {
-                var route = await SelectRoute('Choose which route to restart');
+                var route = await SelectRoute('Choose which area to restart');
                 if (route === false) return;
 
                 if ($$('#cp-list > .list-group[data-route="'+ route +'"] li .item-side i.active').length < 1) {
@@ -215,7 +219,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 }, "json");
             });
             $$("#revert").on("click", async function() {
-                var route = await SelectRoute('Choose which route to restart');
+                var route = await SelectRoute('Choose which area to revert');
                 if (route === false) return;
 
                 if ($$('#cp-list > .list-group[data-route="'+ route +'"] li .item-side i.active').length < 1) {
@@ -503,8 +507,13 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             break;
         }
         case "history": {
+            await init_vmap();
             var account = await get_profile();
-            var filter_calender = app.calendar.create(), filter_date = new Date().setHours(0,0,0,0), filter_search = "";
+            var filter_calender = app.calendar.create({
+                backdrop: true,
+                closeByBackdropClick: true,
+                sheetSwipeToClose: true
+            }), filter_date = new Date().setHours(0,0,0,0), filter_search = "";
             $$('#date').html(new Date(filter_date).toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: 'numeric'} ) );
             $('#viewer').on('processing.dt', function(ev, settings, proc) {
                 $('.dataTables_processing').css('display', 'none');
@@ -512,7 +521,6 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 else app.preloader.hide();
             });
 
-            await init_vmap();
             viewer = $('#viewer').DataTable({
                 serverSide: true,
                 ajax: {
@@ -557,7 +565,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 filter_calender.open();
             });
             $$('#filter_search').on('click', function() {
-                app.dialog.prompt("Search by User name / Area name", "Search", function(val) {
+                app.dialog.prompt("Search by User name / Checkpoint name", "Search", function(val) {
                     filter_search = val;
                     viewer.ajax.reload();
                 });
@@ -827,6 +835,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             break;
         }
         case "checkpoints": {
+            var sort_state = 0;
             function get_cp() {
                 app.preloader.show();
                 $$('#cp-list *').remove();
@@ -910,7 +919,22 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     {text: "Cancel"}
                 ],
                 closeByBackdropClick: false,
-                cssClass: 'dialog-nopad'
+                cssClass: 'dialog-nopad',
+                on: {
+                    opened: () => {
+                        var areas_name = [];
+                        $$('#cp-list .list-group').forEach((el) => {
+                            areas_name.push($(el).data('route'));
+                        });
+                        app.autocomplete.create({
+                            inputEl: 'input[name="route"]',
+                            openIn: 'dropdown',
+                            source: (query, render) => {
+                                render(areas_name.filter(el => el.toLowerCase().indexOf(query.toLowerCase()) >= 0));
+                            }
+                        });
+                    }
+                }
             });
             $$('#editor').remove();
 
@@ -959,6 +983,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             });
             $(document).off('click', '#cp-list ul .item-content');
             $(document).on('click', '#cp-list ul .item-content', function() {
+                if (sort_state == true) return;
                 app.popover.open("#ctx-cp", $$(this), true);
                 $('#ctx-cp').data($(this).data());
             });
@@ -1018,11 +1043,13 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 $$('#cp-list .item-content .item-side').addClass("none");
                 $$('#mnu-primary').addClass('none');
                 $$('#mnu-order').removeClass('none');
+                sort_state = true;
             });
             $$(document).on('sortable:disable', '#cp-list', () => {
                 $$('#cp-list .item-content .item-side').removeClass("none");
                 $$('#mnu-order').addClass('none');
                 $$('#mnu-primary').removeClass('none');
+                sort_state = false;
             });
             break;
         }
@@ -1031,24 +1058,24 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
     }
 });
 
-var areas = [];
 async function init_vmap() {
-    var vmap = plugin.google.maps.Map.getMap();
+    areas = [];
+    var vmap = plugin.google.maps.Map.getMap($$('#vmap')[0]);
     await new Promise((res, rej) => {
         vmap.addKmlOverlay({
             url: KML_MAP
         }, function(kml) {
-            if (kml == null) res();
+            if (kml == null) res(false);
             kml.kmlData.getAt(0).getAt(0).forEach(function(el) {
                 areas.push({
                     name: el.get('name').value,
                     points: el.get('points')
                 });
-            }).then(() => {
-                res();
             });
+            res(true);
         });
     });
+    return vmap;
 }
 function within_areas(coor, areaName) {
     try {
@@ -1090,5 +1117,5 @@ $$(document).on("page:reinit", ".page[data-name=\"check-in\"]", async function(e
 });
 
 $$(document).on("click", "#back", function() {
-    app.views.main.router.back({ignoreCache: false});
+    app.views.main.router.back();
 });

@@ -24,6 +24,10 @@ body {
     width:100%;
 }
 
+.framework7-root .page.page-previous {
+    display: block !important;
+}
+
 .appbar {
     box-shadow: 0 1px 4px 0px rgb(250, 125, 100);
 }
@@ -192,6 +196,16 @@ table.dataTable thead th {
 }
 .dialog .dialog-inner form.list ul {
     --f7-list-bg-color: darksalmon;
+}
+/*form.list .autocomplete-dropdown .list ul {
+    background-color: lightsalmon !important;
+}*/
+
+.vmap {
+    width: 100%;
+    min-width: 200px;
+    height: 100%;
+    max-height: 200px;
 }
 /*.dialog .dialog-inner .dialog-input-field.input-focused:not(.input-outline):after, .md .item-input-focused:not(.item-input-outline) .item-input-wrap:after*/
 /*.accordion-list.custom-cp .accordion-item-opened {

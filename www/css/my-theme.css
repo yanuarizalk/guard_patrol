@@ -16,6 +16,7 @@
     --f7-input-text-color: rgba(120, 50, 0, 0.8);
     /*--f7-dialog-bg-color: darksalmon;*/
     /*--f7-calendar-sheet-bg-color*/
+    --f7-autocomplete-dropdown-bg-color: lightsalmon;
 }
 
 .color-theme-mine {

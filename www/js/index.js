@@ -9,7 +9,7 @@ const CHECKIN_METHOD = {
 };
 var app = new Framework7({
     root: "#app", name: "Security Guard Checkpoint",
-    id: "com.tyfountex.sgc", panel: {
+    id: "com.tyfountex.sgcp", panel: {
         swipe: "left"
     }, routes: routes,
     touch: {
