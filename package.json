@@ -14,11 +14,9 @@
   "license": "MIT",
   "dependencies": {
     "cordova-android": "^8.1.0",
-    "cordova-plugin-browsersync-gen2": "^1.1.6",
+    "cordova-plugin-browsersync-gen2": "^1.1.7",
     "cordova-plugin-geolocation": "^4.0.2",
-    "cordova-plugin-secure-storage": "^3.0.2",
     "cordova-plugin-splashscreen": "^5.0.3",
-    "cordova-plugin-webpack": "^0.4.7",
     "cordova-plugin-zxing": "^1.0.1",
     "cordova-sqlite-storage": "^3.4.0"
   },
@@ -29,16 +27,14 @@
     "plugins": {
       "cordova-plugin-whitelist": {},
       "cordova-plugin-geolocation": {},
-      "cordova-plugin-webpack": {},
       "cordova-sqlite-storage": {},
-      "cordova-plugin-secure-storage": {},
-      "cordova-plugin-browsersync-gen2": {},
       "cordova-plugin-googlemaps": {
         "PLAY_SERVICES_VERSION": "15.0.1",
         "ANDROID_SUPPORT_V4_VERSION": "27.+"
       },
       "cordova-plugin-zxing": {},
-      "cordova-plugin-splashscreen": {}
+      "cordova-plugin-splashscreen": {},
+      "cordova-plugin-browsersync-gen2": {}
     },
     "platforms": [
       "android"

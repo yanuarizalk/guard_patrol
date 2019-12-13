@@ -20,19 +20,9 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     if (data.status == "error") {
                         app.dialog.alert(data.desc, "Error"); return;
                     } else if (data.status == "success") {
-                        db.set(function(key) {
-                            console.log("SS Set token success");
-                        }, function(err) {
-                            console.log("SS Error on Set: " + err)
-                        }, "token", data.token);
-                        
-                        db.set(function(key) {
-                            console.log("SS Set nrp success");
-                        }, function(err) {
-                            console.log("SS Error on Set: " + err)
-                        }, "nrp", nrp);
-
-                        db.set(function(key) {}, function(err) {}, "level", data.level);
+                        localStorage.setItem("token", data.token);
+                        localStorage.setItem("nrp", nrp);
+                        localStorage.setItem("level", data.level);
                         app.views.main.router.navigate("/main");
                     }
                 }, function(xhr, status) {
@@ -49,6 +39,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 $$('.menu-container[data-name="manage"]').remove();
             } else if (account[2] == 1) {
                 $$('.menu-container[data-name="check-in"]').remove();
+                $$('.menu-container[data-name="manage"]').remove();
             }
             $$(".menu-container").on("click", function(ev) {
                 app.views.main.router.navigate("/" + Dom7(this).data("name"));
@@ -56,13 +47,6 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             break;
         }
         case "check-in": {
-            /*function is_finished() {
-                if ($$('#cp-list > ul > li .item-side i.active').length
-                    >=
-                    $$('#cp-list > ul > li .item-side i').length)
-                    return true;
-                else return false;
-            }*/
             function SelectRoute(text) {
                 return new Promise((res, rej) => {
                     var routes = [];
@@ -162,10 +146,6 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 app.views.main.router.navigate("/map");
             });
             $$("#check").on("click", async function(ev) {
-                /*if (is_finished()) {
-                    app.dialog.alert("You have finished the route today! Please, take care of your body!", "Error");
-                    return;
-                }*/
                 var route = await SelectRoute('Choose which area to take in');
                 if (route === false) return;
                 app.views.main.router.navigate({
@@ -175,11 +155,6 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     }
                 });
             });
-            /*$$(document).on("click", "#cp-list > ul > li", function() {
-                var lat = $$(this).data('lat');
-                var lng = $$(this).data('lng');
-                app.views.main.router.navigate('/map/?use_ls=1&lat=' + lat + '&lng=' + lng + "&no_marker=1");
-            });*/
             $$("#restart").on("click", async function() {
                 var route = await SelectRoute('Choose which area to restart');
                 if (route === false) return;
@@ -188,17 +163,13 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     app.dialog.alert("You haven't passed 1 checkpoint yet", "Error");
                     return;
                 }
-                /*if (is_finished()) {
-                    app.dialog.alert("You can't restart/revert if you have finished the route", "Error");
-                    return;
-                }*/
                 var confirm = await new Promise(function(res, rej) {
                     app.dialog.confirm("Are you sure, want to start from zero again?<br><i style='font-size:12px;'>This action can't be undone & your history checkpoint for today will be removed permanently</i>", "Restart Confirmation", 
                     function() { res(true); }, function() { res(false); });
                 });
                 if (!confirm) return;
                 app.preloader.show();
-                var account = await get_profile();
+                var account = get_profile();
                 app.request.post(API_SERVER + "history/restart", {
                     account: {
                         nrp: account[0], token: account[1]
@@ -226,17 +197,13 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     app.dialog.alert("You haven't passed 1 checkpoint yet", "Error");
                     return;
                 }
-                /*if (is_finished()) {
-                    app.dialog.alert("You can't restart/revert if you have finished the route", "Error");
-                    return;
-                }*/
                 var confirm = await new Promise(function(res, rej) {
                     app.dialog.confirm("Are you sure, want to revert back to the last checkpoint?<br><i style='font-size:12px;'>This action can't be undone & your history of last checkpoint will be removed permanently</i>", "Revert Confirmation", 
                     function() { res(true); }, function() { res(false); });
                 });
                 if (!confirm) return;
                 app.preloader.show();
-                var account = await get_profile();
+                var account = get_profile();
                 app.request.post(API_SERVER + "history/restart", {
                     account: {
                         nrp: account[0], token: account[1]
@@ -348,8 +315,6 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                         navigator.camera.getPicture(function(data) {
                             $$("#taken-picture img")[0].src = "data:image/jpeg;base64," + data;
                             area_pic = data;
-                            //$$("#taken-picture img")[0].src = data;
-                            //document.getElementById("pic").src = data;
                             $$(".navbar .title").html("Check - In");
                         }, function(err){
                             if (err == "No Image Selected") {
@@ -388,7 +353,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     app.dialog.alert(coor.error_message, "Error");
                     return;
                 }
-                var account = await get_profile();
+                var account = get_profile();
                 app.request.post(API_SERVER + "checkin", {
                     image: area_pic, coor: coor.latLng, account: {
                         nrp: account[0], token: account[1]
@@ -412,7 +377,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             break;
         }
         case "check_common": {
-            var account = await get_profile();
+            var account = get_profile();
             var region = null;
             init_vmap();
             window.plugins.zxingPlugin.scan({
@@ -508,7 +473,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
         }
         case "history": {
             await init_vmap();
-            var account = await get_profile();
+            var account = get_profile();
             var filter_calender = app.calendar.create({
                 backdrop: true,
                 closeByBackdropClick: true,
@@ -587,7 +552,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
         case "history_detail": {
             app.preloader.show();
             var id = parseInt(page.route.params.history_id);
-            var account = await get_profile();
+            var account = get_profile();
             $$('#taken-picture img')[0].src = API_SERVER + "img/history/" + id + ".jpeg";
             app.request.post(API_SERVER + "history/detail", {
                 //method: "CLASSIC"
@@ -622,7 +587,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
         case "manage": {
             $$(".menu-container").on("click", async function(ev) {
                 if ($$(this).data('name') == "mode") {
-                    var account = await get_profile();
+                    var account = get_profile();
                     var confirm = await new Promise(function(res, rej) {
                         app.dialog.confirm("Are you sure want to change it?<br><i>It will not be applied instantly & will be changed on the next day</i>", "Switch Mode Confirmation", 
                         function() { res(true); }, function() { res(false); });
@@ -652,7 +617,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             break;
         }
         case "users": {
-            var account = await get_profile();
+            var account = get_profile();
             var filter_search = "";
 
             $('#viewer').on('processing.dt', function(ev, settings, proc) {
@@ -668,7 +633,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                         if ($$('#editor input.input-invalid').length > 0) return;
 
                         app.preloader.show();
-                        var account = await get_profile(), xtra = null;
+                        var account = get_profile(), xtra = null;
                         if (ed.params.title.toLowerCase() == "edit user")
                             xtra = $('#editor').data('prev_nrp');
                         app.request.post(API_SERVER + "users/" + (xtra == null ? "new" : "edit"), {
@@ -760,7 +725,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 });
                 if (!confirm) return;
                 app.preloader.show();
-                var account = await get_profile();
+                var account = get_profile();
                 var user_data = $('#ctx-user').data();
                 app.request.post(API_SERVER + "users/unreg", {
                     account: {
@@ -803,7 +768,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 });
                 if (!confirm) return;
                 app.preloader.show();
-                var account = await get_profile();
+                var account = get_profile();
                 var user_data = $('#ctx-user').data();
                 app.request.post(API_SERVER + "users/remove", {
                     account: {
@@ -890,7 +855,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                         if ($$('#editor input.input-invalid').length > 0) return;
 
                         app.preloader.show();
-                        var account = await get_profile(), xtra = null;
+                        var account = get_profile(), xtra = null;
                         if (ed.params.title.toLowerCase() == "edit checkpoint")
                             xtra = $('#editor').data('prev_data');
                         app.request.post(API_SERVER + "checkpoint/" + (xtra == null ? "new" : "edit"), {
@@ -959,7 +924,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 });
                 if (!confirm) return;
                 app.preloader.show();
-                var account = await get_profile();
+                var account = get_profile();
                 var cp_data = $('#ctx-cp').data();
                 app.request.post(API_SERVER + "checkpoint/remove", {
                     account: {
@@ -1003,7 +968,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 if (!confirm) return;
                 var orders = [];
                 var i = 0;
-                var account = await get_profile();
+                var account = get_profile();
                 $$('#cp-list .list-group').forEach((elGroup) => {
                     i++; var seq = 1;
                     $$('#cp-list .list-group:nth-child('+ i +') li.item-content').forEach((el) => {
@@ -1090,7 +1055,7 @@ function within_areas(coor, areaName) {
 
 async function check_cp() {
     if ($$(app.views.main.router.currentPageEl).data('name') != "check-in") return;
-    var account = await get_profile();
+    var account = get_profile();
     app.request.post(API_SERVER + "history/user", {
         account: {
             nrp: account[0], token: account[1]
@@ -1111,6 +1076,13 @@ async function check_cp() {
         console.log(xhr);
     }, "json");
 }
+
+$$('document').on("xhr.dt", "#viewer", (e, set, json, xhr) => {
+    if (json.status.toLowerCase() == "error") {
+        app.preloader.hide();
+        app.dialog.alert(json.desc, "Error");
+    }
+});
 
 $$(document).on("page:reinit", ".page[data-name=\"check-in\"]", async function(ev, page) {
     check_cp();
