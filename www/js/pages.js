@@ -47,8 +47,19 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             break;
         }
         case "check-in": {
-            function SelectRoute(text) {
-                return new Promise((res, rej) => {
+            function SelectRoute(id, byCheckpoint = false) {
+                $$('#cp-list .list-group').forEach((el) => {
+                    if (byCheckpoint) {
+                        if ($$(el).find('li[data-id="'+ id +'"]').length > 0) $$(el).addClass("active");
+                        else $$(el).removeClass("active");
+                    } else {
+                        if ($$(el).data('route') == id) $$(el).addClass("active");
+                        else $$(el).removeClass("active");
+                    }
+                });
+            }
+            async function PromptRoute() {
+                return await new Promise((res, rej) => {
                     var routes = [];
                     $$('#cp-list .list-group').forEach((el) => {
                         routes.push({
@@ -60,18 +71,53 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     });
                     app.dialog.create({
                         title: 'Select Area',
-                        text: text,
+                        text: 'Select which area to take in',
                         buttons: routes,
                         verticalButtons: true,
-                        closeByBackdropClick: true,
-                        on: {
-                            closed: function() {
-                                res(false);
-                            }
-                        }
+                        closeByBackdropClick: false
                     }).open();
                 });
             }
+            async function check_cp() {
+                if ($$(app.views.main.router.currentPageEl).data('name') != "check-in") return;
+                var account = get_profile(), passed = [];
+                await new Promise((res, rej) => {
+                    app.request.post(API_SERVER + "history/user", {
+                        account: {
+                            nrp: account[0], token: account[1]
+                        }
+                    }, 
+                    function(data, status, xhr) {
+                        if (data.status == "error") {
+                            app.dialog.alert(data.desc, "Error"); 
+                            res(passed); return;
+                        } else if (data.status == "success") {
+                            $$('#cp-list ul > li').each(function(index,el) {
+                                if (data.passed_cp.find(arr => arr.cp_id == $$(el).data('id')) == null)
+                                    $$('#cp-list ul > li[data-id="'+ $$(el).data('id') +'"] .item-side i').removeClass('active');
+                                else {
+                                    $$('#cp-list ul > li[data-id="'+ $$(el).data('id') +'"] .item-side i').addClass('active');
+                                    passed.push($$(el).data('id'));
+                                }
+                            });
+                            res(passed);
+                        }
+                    }, function(xhr, status) {
+                        console.log(xhr);
+                        res(passed);
+                    }, "json");
+                });
+                if (passed.length > 0)
+                    SelectRoute(passed[0], true);
+                else {
+                    var route = await PromptRoute();
+                    if (route !== false)
+                        SelectRoute(route);
+                }
+            }
+            $$(document).on("page:reinit", ".page[data-name=\"check-in\"]", async function(ev, page) {
+                check_cp();
+            });
 
             app.preloader.show();
             app.request.post(API_SERVER + "checkpoint", null, 
@@ -94,7 +140,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                             var cp = data.checkpoints[gIndex][cpIndex];
                             if (cp.active != 1) continue;
                             var html = 
-                            '<li data-id="'+ cp.id +'" data-lat="'+ cp.latitude +'" data-lng="'+ cp.longitude +'">' +
+                            '<li data-id="'+ cp.id +'">' +
                                 '<a href="#" class="item-content item-link">' +
                                     '<div class="item-inner">' +
                                         '<div class="item-title">'+ cp.name +'</div>' +
@@ -140,14 +186,16 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 console.log(xhr);
             }, "json");
 
-            check_cp();
+            await check_cp();
+            var selected_route = () => {
+                return $$('#cp-list .list-group.active').data("route");
+            };
 
             $$("#show-map").on("click", function(ev) {
                 app.views.main.router.navigate("/map");
             });
             $$("#check").on("click", async function(ev) {
-                var route = await SelectRoute('Choose which area to take in');
-                if (route === false) return;
+                var route = selected_route();
                 app.views.main.router.navigate({
                     name: $$("#check").data("method").toUpperCase() == "COMMON" ? "check_common" : "check_classic",
                     params: {
@@ -156,8 +204,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 });
             });
             $$("#restart").on("click", async function() {
-                var route = await SelectRoute('Choose which area to restart');
-                if (route === false) return;
+                var route = selected_route();
 
                 if ($$('#cp-list > .list-group[data-route="'+ route +'"] li .item-side i.active').length < 1) {
                     app.dialog.alert("You haven't passed 1 checkpoint yet", "Error");
@@ -190,8 +237,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 }, "json");
             });
             $$("#revert").on("click", async function() {
-                var route = await SelectRoute('Choose which area to revert');
-                if (route === false) return;
+                var route = selected_route();
 
                 if ($$('#cp-list > .list-group[data-route="'+ route +'"] li .item-side i.active').length < 1) {
                     app.dialog.alert("You haven't passed 1 checkpoint yet", "Error");
@@ -227,7 +273,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
         }
         case "map": {
             var markers = [];
-            var map = plugin.google.maps.Map.getMap(document.getElementById("map"), {
+            /*var map = plugin.google.maps.Map.getMap(document.getElementById("map"), {
                 controls: {
                     myLocationButton: true,
                     myLocation: true
@@ -248,6 +294,12 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                         res(tAreas);
                     });
                 });
+            });*/
+            var map = await init_vmap("map", {
+                controls: {
+                    myLocationButton: true,
+                    myLocation: true
+                }
             });
             var coor = DEFAULT_LOCATION;
             if (page.route.query.lat != null && page.route.query.lng != null) {
@@ -374,6 +426,9 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     console.log(xhr);
                 }, "json");
             });
+            $$('#location').click(() => {
+                app.views.main.router.navigate("/map");
+            });
             break;
         }
         case "check_common": {
@@ -469,6 +524,9 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     console.log(xhr);
                 }, "json");
             });
+            $$('#location').click(() => {
+                app.views.main.router.navigate("/map");
+            });
             break;
         }
         case "history": {
@@ -517,6 +575,9 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     emptyTable: 'There is no checkpoint record on this date',
                     info: 'Showing _END_ entries',
                     infoEmpty: ''
+                },
+                rowGroup: {
+                    dataSrc: 'route'
                 }
             });
             filter_calender.on('change', function(cal) {
@@ -539,6 +600,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             $(document).off('click', '#viewer tbody tr');
             $(document).on('click', '#viewer tbody tr', function() {
                 if ($$(this).children('td').hasClass('dataTables_empty')) return;
+                if ($$(this).hasClass('dtrg-group')) return;
                 app.views.main.router.navigate({
                     name: 'history_detail',
                     params: {
@@ -1023,9 +1085,9 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
     }
 });
 
-async function init_vmap() {
+async function init_vmap(divMap = "vmap", options = null) {
     areas = [];
-    var vmap = plugin.google.maps.Map.getMap($$('#vmap')[0]);
+    var vmap = plugin.google.maps.Map.getMap($$('#' + divMap)[0], options);
     await new Promise((res, rej) => {
         vmap.addKmlOverlay({
             url: KML_MAP
@@ -1053,30 +1115,6 @@ function within_areas(coor, areaName) {
     }
 }
 
-async function check_cp() {
-    if ($$(app.views.main.router.currentPageEl).data('name') != "check-in") return;
-    var account = get_profile();
-    app.request.post(API_SERVER + "history/user", {
-        account: {
-            nrp: account[0], token: account[1]
-        }
-    }, 
-    function(data, status, xhr) {
-        if (data.status == "error") {
-            app.dialog.alert(data.desc, "Error"); return;
-        } else if (data.status == "success") {
-            $$('#cp-list ul > li').each(function(index,el) {
-                if (data.passed_cp.find(arr => arr.cp_id == $$(el).data('id')) == null)
-                    $$('#cp-list ul > li[data-id="'+ $$(el).data('id') +'"] .item-side i').removeClass('active');
-                else
-                    $$('#cp-list ul > li[data-id="'+ $$(el).data('id') +'"] .item-side i').addClass('active');
-            });
-        }
-    }, function(xhr, status) {
-        console.log(xhr);
-    }, "json");
-}
-
 $$('document').on("xhr.dt", "#viewer", (e, set, json, xhr) => {
     if (json.status.toLowerCase() == "error") {
         app.preloader.hide();
@@ -1084,9 +1122,7 @@ $$('document').on("xhr.dt", "#viewer", (e, set, json, xhr) => {
     }
 });
 
-$$(document).on("page:reinit", ".page[data-name=\"check-in\"]", async function(ev, page) {
-    check_cp();
-});
+
 
 $$(document).on("click", "#back", function() {
     app.views.main.router.back();

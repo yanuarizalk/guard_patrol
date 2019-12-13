@@ -8,9 +8,6 @@
     </div>
     <div class="page-content">
         <div class="block-title"><h3>Checkpoint List</h3></div>
-        <!--div class="list accordion-list custom-cp" id="cp-list">
-            <ul></ul>
-        </div-->
         <div class="list custom-cp" id="cp-list">
             
         </div>
@@ -31,7 +28,12 @@
             .accordion-list.custom-cp .accordion-item-content button.button.button-fill:nth-of-type(1) {
                 margin-left: auto; margin-right: 0;
             }*/
-            
+            #cp-list .list-group {
+                display: none;
+            }
+            #cp-list .list-group.active {
+                display: block;
+            }
         </style>
 
     </div>

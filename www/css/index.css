@@ -161,14 +161,25 @@ body {
     height: 100%; width: 100% !important;
     border-bottom: 1px solid salmon !important;
 }
-table.dataTable thead th {
-    border-bottom: 1px solid salmon !important;
+table.table-viewer thead th {
+    /*border-bottom: 1px solid salmon !important;*/
+    border-bottom: transparent !important;
+}
+table.table-viewer thead {
+    background-color: darksalmon;
+    box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.5);
 }
 .table-viewer tbody {
     color: darkslategrey;
 }
 .table-viewer tbody tr:hover {
     filter: brightness(0.5);
+}
+.dataTables_wrapper table.table-viewer tbody tr.dtrg-group {
+    background-color: transparent;
+}
+table.table-viewer tbody tr.dtrg-group td {
+    background-color: transparent;
 }
 .dataTables_wrapper .dataTables_info {
     color: saddlebrown !important;
@@ -197,6 +208,7 @@ table.dataTable thead th {
 .dialog .dialog-inner form.list ul {
     --f7-list-bg-color: darksalmon;
 }
+
 /*form.list .autocomplete-dropdown .list ul {
     background-color: lightsalmon !important;
 }*/
