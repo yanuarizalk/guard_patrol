@@ -33,7 +33,8 @@ function get_profile() {
     return [
         localStorage.getItem("nrp"),
         localStorage.getItem("token"),
-        localStorage.getItem("level")
+        localStorage.getItem("level"),
+        localStorage.getItem("name")
     ];
 }
 

@@ -23,6 +23,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                         localStorage.setItem("token", data.token);
                         localStorage.setItem("nrp", nrp);
                         localStorage.setItem("level", data.level);
+                        localStorage.setItem("name", data.name);
                         app.views.main.router.navigate("/main");
                     }
                 }, function(xhr, status) {
@@ -42,7 +43,14 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 $$('.menu-container[data-name="manage"]').remove();
             }
             $$(".menu-container").on("click", function(ev) {
-                app.views.main.router.navigate("/" + Dom7(this).data("name"));
+                if ($$(this).data("name") == "profile") {
+                    var acc = get_profile();
+                    app.dialog.alert(
+                        "Name: " + acc[3] + "<br/>" + "NRP: " + acc[0],
+                    "Profile");
+                    return;
+                }
+                app.views.main.router.navigate("/" + $$(this).data("name"));
             });
             break;
         }
