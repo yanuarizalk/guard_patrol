@@ -1,5 +1,5 @@
 var viewer;
-var areas = [];
+var areas = [], cp_marker = [], lines = [];
 
 $$(document).on("page:mounted", ".page", async function(ev, page) {
     switch (page.name) {
@@ -74,7 +74,12 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                         text: 'Select which area to take in',
                         buttons: routes,
                         verticalButtons: true,
-                        closeByBackdropClick: false
+                        closeByBackdropClick: true,
+                        on: {
+                            closed: (a) => {
+                                res(false);
+                            }
+                        }
                     }).open();
                 });
             }
@@ -273,28 +278,6 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
         }
         case "map": {
             var markers = [];
-            /*var map = plugin.google.maps.Map.getMap(document.getElementById("map"), {
-                controls: {
-                    myLocationButton: true,
-                    myLocation: true
-                }
-            });
-            var areas = await new Promise((res, rej) => {
-                map.addKmlOverlay({
-                    url: KML_MAP, clickable: true, suppressInfoWindow: true
-                }, function(kml) {
-                    if (kml == null) res(false);
-                    var tAreas = [];
-                    kml.kmlData.getAt(0).getAt(0).forEach(function(el) {
-                        tAreas.push({
-                            name: el.get('name').value,
-                            points: el.get('points')
-                        });
-                    }).then(() => {
-                        res(tAreas);
-                    });
-                });
-            });*/
             var map = await init_vmap("map", {
                 controls: {
                     myLocationButton: true,
@@ -314,6 +297,22 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     });
                     markers.push(marker);
                 }
+
+                if (page.route.query.dir != null) {
+                    var dirCoor = cp_marker.find((el) => el.name == page.route.query.dir).points;
+                    var polyline = map.addPolyline({
+                        points: [
+                            coor, dirCoor
+                        ]
+                    });
+                    var distance = plugin.google.maps.geometry.spherical.computeDistanceBetween(coor, dirCoor);
+                    $$('#distance').addClass("active");
+                    $$('#distance').html("Estimated Distance: " + distance.toFixed() + " meter");
+                    /*polyline.on(plugin.google.maps.event.POLYLINE_CLICK, () => {
+                        app.dialog.alert("Distance between security position & area location: " + distance + " (m)", "Distance Measurement");
+                    });*/
+                    lines.push(polyline);
+                }
             }
             map.animateCamera({
                 target: coor,
@@ -322,6 +321,10 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 bearing: 0,
                 duration: 3000
             });
+            /*map.on(plugin.google.maps.event.MY_LOCATION_CLICK, (loc) => {
+                if (localStorage.getItem("level") == 1) return;
+                
+            });*/
 
             $$('#select_type').on('click', function() {
                 app.dialog.create({
@@ -566,7 +569,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                 ], 
                 createdRow: function(row, data, index) {
                     data = data.DT_RowData;
-                    var is_there = within_areas(data.coor, data.checkpoint_name);
+                    var is_there =  within_areas(data.coor, data.checkpoint_name);
                     if (is_there) $$(row).addClass('active');
                     else if (is_there == null) $$(row).addClass('error');
                 },
@@ -632,6 +635,7 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                     $$('#by').html(data.by);
                     $$('#location').data('lat', data.lat);
                     $$('#location').data('lng', data.lng);
+                    $$('#location').data('dir', data.cp_name);
                 }
             }, function(xhr, status) {
                 app.preloader.hide();
@@ -642,7 +646,8 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             $$('#location').on('click', function() {
                 var lat = $$(this).data('lat');
                 var lng = $$(this).data('lng');
-                app.views.main.router.navigate('/map/?use_ls=0&lat=' + lat + '&lng=' + lng);
+                var dir = $$(this).data('dir');
+                app.views.main.router.navigate('/map/?use_ls=0&lat=' + lat + '&lng=' + lng + '&dir=' + dir);
             });
             break;
         }
@@ -1092,11 +1097,20 @@ async function init_vmap(divMap = "vmap", options = null) {
         vmap.addKmlOverlay({
             url: KML_MAP
         }, function(kml) {
+            console.log(kml);
             if (kml == null) res(false);
-            kml.kmlData.getAt(0).getAt(0).forEach(function(el) {
+            var cp_area_layer = kml.kmlData.getAt(0).filter(el => el.get("name") == "Checkpoints Area")[0];
+            var cp_marker_layer = kml.kmlData.getAt(0).filter(el => el.get("name") == "Checkpoints Marker")[0];
+            cp_area_layer.forEach((el) => {
                 areas.push({
                     name: el.get('name').value,
                     points: el.get('points')
+                });
+            });
+            cp_marker_layer.forEach((el) => {
+                cp_marker.push({
+                    name: el.get('name').value,
+                    points: el.get('position')
                 });
             });
             res(true);
