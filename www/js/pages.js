@@ -133,48 +133,61 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
             });
 
             app.preloader.show();
-            app.request.post(API_SERVER + "checkpoint", null, 
-            function(data, status, xhr) {
-                app.preloader.hide();
-                if (data.status == "error") {
-                    app.dialog.alert(data.desc, "Error"); return;
-                } else if (data.status == "success") {
-                    var amount = data.amount;
-                    for (var gIndex in data.checkpoints) {
-                        if (gIndex == "") continue;
-                        if (data.checkpoints[gIndex].find((el) => {
-                            return el.active == 1
-                        }) == null) continue;
-                        $$('#cp-list').append(
-                            '<div class="list-group" data-route="'+ gIndex +'"><ul>' +
-                                '<li class="list-group-title">Area '+ gIndex +'</li>'
-                        );
-                        for (var cpIndex in data.checkpoints[gIndex]) {
-                            var cp = data.checkpoints[gIndex][cpIndex];
-                            if (cp.active != 1) continue;
-                            var html = 
-                            '<li data-id="'+ cp.id +'">' +
-                                '<a href="#" class="item-content item-link">' +
-                                    '<div class="item-inner">' +
-                                        '<div class="item-title">'+ cp.name +'</div>' +
-                                    '</div>' +
-                                    '<div class="item-side">' +
-                                        '<i class="f7-icons">flag_fill</i>' +
-                                    '</div>' +
-                                '</a>' +
-                            '</li>';
-                            $$('#cp-list > .list-group:last-child > ul').append(html);
+            app.request({
+                url: API_SERVER + "checkpoint",
+                async: false,
+                method: "POST",
+                crossDomain: true,
+                data: null, dataType: "json",
+                success: (data, status, xhr) => {
+                    app.preloader.hide();
+                    if (data.status == "error") {
+                        app.dialog.alert(data.desc, "Error"); return;
+                    } else if (data.status == "success") {
+                        var amount = data.amount;
+                        for (var gIndex in data.checkpoints) {
+                            if (gIndex == "") continue;
+                            if (data.checkpoints[gIndex].find((el) => {
+                                return el.active == 1
+                            }) == null) continue;
+                            $$('#cp-list').append(
+                                '<div class="list-group" data-route="'+ gIndex +'"><ul>' +
+                                    '<li class="list-group-title">Area '+ gIndex +'</li>'
+                            );
+                            for (var cpIndex in data.checkpoints[gIndex]) {
+                                var cp = data.checkpoints[gIndex][cpIndex];
+                                if (cp.active != 1) continue;
+                                var html = 
+                                '<li data-id="'+ cp.id +'">' +
+                                    '<a href="#" class="item-content item-link">' +
+                                        '<div class="item-inner">' +
+                                            '<div class="item-title">'+ cp.name +'</div>' +
+                                        '</div>' +
+                                        '<div class="item-side">' +
+                                            '<i class="f7-icons">flag_fill</i>' +
+                                        '</div>' +
+                                    '</a>' +
+                                '</li>';
+                                $$('#cp-list > .list-group:last-child > ul').append(html);
+                            }
+                            $$('#cp-list').append(
+                                '</ul></div>'
+                            );
                         }
-                        $$('#cp-list').append(
-                            '</ul></div>'
-                        );
                     }
+                }, error: (xhr, status) => {
+                    app.preloader.hide();
+                    app.dialog.alert("Error while fetching data to the server.", "Unexpected Server Error");
+                    console.log(xhr);
                 }
-            }, function(xhr, status) {
-                app.preloader.hide();
-                app.dialog.alert("Error while fetching data to the server.", "Unexpected Server Error");
-                console.log(xhr);
-            }, "json");
+            })
+
+            // app.request.post(API_SERVER + "checkpoint", null, 
+            // function(data, status, xhr) {
+                
+            // }, function(xhr, status) {
+                
+            // }, "json");
 
             app.request.post(API_SERVER + "use_method", null, 
             function(data, status, xhr) {
