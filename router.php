@@ -24,7 +24,7 @@
             /*->withStatus(200)*/;
             //->withHeader('Access-Control-Allow-Method', '');
         if ($data === null || !is_numeric($data["nrp"])) return errReqData($res);
-        $db['query'] = $db['conn'] -> prepare("SELECT level, is_used FROM users WHERE nrp = :nrp");
+        $db['query'] = $db['conn'] -> prepare("SELECT level, is_used, name FROM users WHERE nrp = :nrp");
         if (!$db['query']->execute([
             ':nrp' => $data["nrp"]
         ])) return errQuery($res, $db['query']);
@@ -44,7 +44,7 @@
             ':token' => $token,
             ':nrp' => $data['nrp']
         ]) ) return errQuery($res, $db['query']);
-        $res->getBody()->write(json_encode(["status" => "success", "token" => $token, "level" => $db['res']['level']]));
+        $res->getBody()->write(json_encode(["status" => "success", "token" => $token, "level" => $db['res']['level'], "name" => $db['res']['name']]));
         return $res;
     });
 
@@ -442,6 +442,7 @@
             "SELECT 
                 history.id, checkpoint.name AS checkpoint_name, users.name AS user_name,
                 history.dt, history.cp_id AS checkpoint_id, history.user_nrp AS user_nrp,
+                checkpoint.route,
                 /*checkpoint.region AS region,*/ history.latitude, history.longitude, method
             FROM history 
             INNER JOIN checkpoint ON history.cp_id = checkpoint.id 
@@ -449,7 +450,7 @@
             WHERE 
                 dt >= :minDate AND dt < :maxDate AND
                 (checkpoint.name LIKE :search OR users.name LIKE :search)
-            ORDER BY ".$order_by." ".$order_as
+            ORDER BY route, ".$order_by." ".$order_as
         );
         if (!$db['query']->execute([
             ':minDate' => $minDate,
@@ -473,7 +474,8 @@
                 ],
                 'user_name' => $val['user_name'],
                 'checkpoint_name' => $val['checkpoint_name'],
-                'time_taken' => date('H:i', $val['dt'])
+                'time_taken' => date('H:i', $val['dt']),
+                'route' => $val['route']
             ]);
         }
 
@@ -511,6 +513,35 @@
         $res->getBody()->write(json_encode([
             "status" => "success",
             "passed_cp" => $db['res']
+        ]));
+        return $res;
+    });
+    $app->post('/history/user/current', function($req, $res, $args) {
+        global $db;
+
+        $data = $req->getParsedBody();
+        $res = $res->withHeader('Content-Type', 'application/json')
+            ->withHeader('Access-Control-Allow-Origin', '*')
+            ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
+
+        if (!isset($data['account']['nrp'], $data['account']['token'])) return errReqData($res);
+        if (!check_profile($data['account']['nrp'], $data['account']['token'])) return errUnauthorized($res);
+        $db['query'] = $db['conn'] -> prepare(
+            "SELECT 
+                route
+            FROM history 
+            INNER JOIN checkpoint ON cp_id = checkpoint.id
+            WHERE checkpoint.active = 1 AND user_nrp = :nrp AND
+                is_finished = 0 ORDER BY history.id DESC LIMIT 1"
+        );
+        if (!$db['query']->execute([
+            ':nrp' => $data['account']['nrp']
+        ])) return errQuery($res, $db['query']);
+        $db['res'] = $db['query'] -> fetch(PDO::FETCH_ASSOC);
+        $cur_cp = current_checkpoint($data['account']['nrp'], $db['res']['route'], true);
+        $res->getBody()->write(json_encode([
+            "status" => "success",
+            "current_cp" => $cur_cp
         ]));
         return $res;
     });
@@ -581,7 +612,8 @@
             "on" => '<b>'.$db['res']['checkpoint_name'].'</b>, &nbsp;'.date("d M Y - H:i:s", $db['res']['dt']), 
             "by" => '<b>'.$db['res']['user_name'].'</b> ('.substr_replace($db['res']['user_nrp'], '-', 6, 0).')',
             "lat" => $db['res']['latitude'],
-            "lng" => $db['res']['longitude']
+            "lng" => $db['res']['longitude'],
+            "cp_name" => $db['res']['checkpoint_name']
         ]));
         return $res;
     });
