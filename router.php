@@ -663,7 +663,7 @@
 
         switch($order_by) {
             case 1: $order_by = 'name'; break;
-            case 2: $order_by = 'registration_date'; break;
+            case 2: $order_by = 'level'; break;
             case 0: 
             default: $order_by = 'nrp'; break;
         }
