@@ -1,6 +1,7 @@
 var routes = [
-    {path: "/", url: "./pages/register.html"
-    },
+    {path: "/", url: "./pages/register.html", options: {
+        transition: 'f7-dive'
+    }},
     {path: "/main", url: "./pages/main.html", options: {
         transition: 'f7-dive'
     }},

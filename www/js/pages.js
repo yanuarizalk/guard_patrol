@@ -827,7 +827,12 @@ $$(document).on("page:mounted", ".page", async function(ev, page) {
                         app.dialog.alert(data.desc, "Error");
                     } else if (data.status == "success") {
                         app.dialog.alert("User "+ user_data.name +" have been unregistered!", "Unregister Success");
-                        $('#viewer').DataTable().ajax.reload();
+                        if (account[0] == user_data.nrp)
+                            app.views.main.router.navigate('/', {
+                                clearPreviousHistory: true
+                            });
+                        else
+                            $('#viewer').DataTable().ajax.reload();
                     }
                 }, function(xhr, status) {
                     app.preloader.hide();

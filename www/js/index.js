@@ -14,7 +14,7 @@ var app = new Framework7({
     }, routes: routes,
     touch: {
         tapHold: true
-    }
+    }, version: "1.0.2"
 });
 var $$ = Dom7;
 
